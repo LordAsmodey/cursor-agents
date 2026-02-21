@@ -16,6 +16,7 @@ This document describes each agent in the system. It is intended for both humans
 | **frontend-tester** | Run frontend test suite; report PASSED or FAILED with actionable summary | Test phase, after all implementation tasks |
 | **backend-tester** | Run backend test suite; report PASSED or FAILED with actionable summary | Test phase, after frontend-tester |
 | **e2e-tester** | Build application and run E2E/integration tests | Test phase, after backend-tester |
+| **docs-writer** | Create/update ADR, README, docs/ after implementation | Docs phase, after test phase; invoked by Orchestrator |
 
 ## Architect
 
@@ -25,7 +26,7 @@ This document describes each agent in the system. It is intended for both humans
 
 ## Orchestrator
 
-- **Does:** Receives the feature request; decides whether to call Architect; calls Planner with feature + optional architecture; receives plan; runs each task by calling Worker then Reviewer (by assignee); handles rework and circuit breaker; after all tasks runs test phase (frontend-tester → backend-tester → e2e-tester) and on test FAILED reworks affected tasks up to 3 times; reports to user.
+- **Does:** Receives the feature request; decides whether to call Architect; calls Planner with feature + optional architecture; receives plan; runs each task by calling Worker then Reviewer (by assignee); handles rework and circuit breaker; after all tasks runs test phase (frontend-tester → backend-tester → e2e-tester) and on test FAILED reworks affected tasks up to 3 times; then runs docs phase (docs-writer) and reports to user.
 - **Does not:** Write code, review code, or create the implementation plan (Planner creates the plan).
 - **Output:** No standalone output; drives the workflow and produces the final report to the user.
 
@@ -77,6 +78,12 @@ This document describes each agent in the system. It is intended for both humans
 - **Does:** Builds the application and runs E2E/integration tests; reports **Test Result: PASSED** or **FAILED** with Summary and, if FAILED, Failures and Suggested focus. Invoked by Orchestrator after frontend-tester and backend-tester.
 - **Does not:** Implement or fix code; run only unit/component tests.
 - **Output:** Structured block per `.cursor/agents/e2e-tester.md` (PASSED/FAILED + summary/failures).
+
+## Docs Writer
+
+- **Does:** After the test phase, creates or updates documentation only: ADR from template when Architect suggested `adr_candidate`, README or `docs/` for setup/usage when the feature affects them. Invoked once by Orchestrator; no retry loop.
+- **Does not:** Modify source code, tests, or config; introduce new architecture.
+- **Output:** Docs Result: DONE or SKIPPED; Summary; Files created/updated; Notes (see `.cursor/agents/docs-writer.md`).
 
 ## Adding New Agents
 
