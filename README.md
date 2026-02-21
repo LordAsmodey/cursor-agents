@@ -20,10 +20,10 @@ Agents are invoked via Cursor’s `mcp_task` (or equivalent) by an executing age
 | **Architect** | Full-stack design: frontend/backend structure, contracts, DTOs, constraints for the Planner. Optional for trivial features. |
 | **Orchestrator** | Management only: decides whom to call (Architect, Planner, Workers, Reviewers) and what to pass; does not write code or create the plan. |
 | **Planner** | Creates the implementation plan: atomic tasks, dependencies, execution order, assignees. Consumes architecture when provided. |
-| **Workers** | Implement a single scoped task (e.g. `frontend-worker`, future `backend-worker`). |
-| **Reviewers** | Review changes for scope, architecture compliance, and quality (e.g. `frontend-reviewer`). |
+| **Workers** | Implement a single scoped task (e.g. `frontend-worker`, `backend-worker`). |
+| **Reviewers** | Review changes for scope, architecture compliance, and quality (e.g. `frontend-reviewer`, `backend-reviewer`). |
 | **Agent Registry** | Maps task `assignee` (from Planner) → `subagent_type` so the Orchestrator knows which agent to call. |
-| **Circuit breaker** | After 3 failed review iterations for a task, the workflow freezes it and escalates instead of retrying. |
+| **Circuit breaker** | The Orchestrator keeps a rework_count per task (max 3 retries). After 3 retries, the task is frozen, summarized, and next steps are suggested; no infinite Worker↔Reviewer loops. |
 
 ## Project Structure
 
@@ -37,6 +37,8 @@ Agents are invoked via Cursor’s `mcp_task` (or equivalent) by an executing age
     planner.md
     frontend-worker.md
     frontend-reviewer.md
+    backend-worker.md
+    backend-reviewer.md
 docs/              # Project documentation (architecture, agents, workflow)
 ROADMAP.md         # Roadmap and todo: agents/teams to add
 ```
@@ -46,7 +48,7 @@ ROADMAP.md         # Roadmap and todo: agents/teams to add
 - Say **"implement"** or **"implement: &lt;feature description&gt;"** in Cursor.
 - The rule in `.cursor/rules/` applies the **implement-feature** skill.
 - The executing agent acts as **Orchestrator**: (as needed) call Architect → call **Planner** to get the plan → for each task call Worker then Reviewer → report to you.
-- Ensure your environment has the corresponding `subagent_type` values (e.g. `architect`, `planner`, `frontend-worker`, `frontend-reviewer`) so `mcp_task` can dispatch to them.
+- Ensure your environment has the corresponding `subagent_type` values (e.g. `architect`, `planner`, `frontend-worker`, `frontend-reviewer`, `backend-worker`, `backend-reviewer`) so `mcp_task` can dispatch to them.
 
 ## Documentation
 
@@ -57,7 +59,7 @@ ROADMAP.md         # Roadmap and todo: agents/teams to add
 
 ## Extending the System
 
-- **New domain (e.g. backend):** Add `backend-worker` and `backend-reviewer` agent definitions, register them in the implement-feature skill’s Agent Registry, and use the same assignees in Architect and Planner outputs.
+- **New domain (e.g. tests, docs):** Add the new worker and reviewer agent definitions, register them in the implement-feature skill’s Agent Registry, and use the same assignees in Architect and Planner outputs.
 - **New rules:** Add `.mdc` files under `.cursor/rules/`.
 - **New skills:** Add skill folders under `.cursor/skills/` and reference them from rules or docs.
 

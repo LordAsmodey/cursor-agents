@@ -129,7 +129,7 @@ function useAuth(): {
 - Scope hints (files/modules each task may touch) — each must map to 1+ achievable tasks
 - Execution order recommendations
 - Dependencies (sequential vs parallel)
-- Suggested assignees: `frontend-worker`, `frontend-reviewer`, or backend equivalents if defined
+- Suggested assignees: `frontend-worker`, `frontend-reviewer` for frontend scope; `backend-worker`, `backend-reviewer` for backend scope
 
 **Decomposability check:** Verify each `scope_hint` yields clear acceptance criteria and non-overlapping deliverables.
 
