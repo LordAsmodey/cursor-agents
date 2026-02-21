@@ -48,8 +48,17 @@ User: "implement: <feature>"
 └─────────────────────────────────────────────────────────┘
          │
          ▼
+┌─────────────────────────────────────────────────────────┐
+│ 3.5 TEST PHASE (after all implementation tasks)          │
+│    frontend-tester → backend-tester → e2e-tester        │
+│    If any FAILED: test_retry_count++; if < 3: rework    │
+│    affected tasks (Worker → Reviewer) → testers again   │
+│    If test_retry_count ≥ 3: circuit breaker → user       │
+└─────────────────────────────────────────────────────────┘
+         │
+         ▼
 ┌─────────────────┐
-│ 4. REPORT       │  Summarize: what was done, files changed, any failures
+│ 4. REPORT       │  Summarize: what was done, tests, files changed, failures
 │    to User      │
 └─────────────────┘
 ```
@@ -66,10 +75,13 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 | frontend-reviewer  | frontend-reviewer | Review frontend changes       |
 | backend-worker     | backend-worker    | Implement backend task        |
 | backend-reviewer   | backend-reviewer  | Review backend changes        |
+| frontend-tester    | frontend-tester   | Run frontend test suite       |
+| backend-tester     | backend-tester    | Run backend test suite        |
+| e2e-tester         | e2e-tester        | Build app + E2E/integration   |
 | architect          | architect         | Produce architecture design   |
 | planner            | planner           | Create tasks + execution plan |
 
-**Adding agents:** Define new assignees in Architect and Planner outputs (e.g. `test-runner`, `docs-writer`), add corresponding rows here and ensure those subagent types exist in the environment.
+**Adding agents:** Define new assignees in Architect and Planner outputs (e.g. `test-runner`, `docs-writer`), add corresponding rows here and ensure those subagent types exist in the environment. Testers are invoked by the Orchestrator during the Test Phase, not by task assignee.
 
 ---
 
@@ -124,9 +136,40 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
      - If rework_count for this task **&lt; 3**: pass the reviewer’s issues back to the same Worker (same task + list of issues to fix) and go to step 3.1 for this task again.  
      - If rework_count **≥ 3**: run **circuit breaker** for this task (see “After 3 retries” below); then continue with the next task or report to user — do not retry this task again.
 
+### Step 3.5: Test Phase (after all implementation tasks)
+
+Run testers in order; maintain **test_retry_count** (initially **0**). Maximum **3 test retry cycles**: if tests fail, rework affected tasks (Worker → Reviewer) and re-run test phase; after 3 such cycles, run the test circuit breaker.
+
+1. **Call frontend-tester**  
+   - `subagent_type` = `frontend-tester`.  
+   - **Prompt:** “Run the frontend test suite for this project. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/frontend-tester.md.”  
+   - If **PASSED**, continue to step 3.5.2.  
+   - If **FAILED**: go to step 3.5.4 (test rework cycle).
+
+2. **Call backend-tester**  
+   - `subagent_type` = `backend-tester`.  
+   - **Prompt:** “Run the backend test suite for this project. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/backend-tester.md.”  
+   - If **PASSED**, continue to step 3.5.3.  
+   - If **FAILED**: go to step 3.5.4 (test rework cycle).
+
+3. **Call e2e-tester**  
+   - `subagent_type` = `e2e-tester`.  
+   - **Prompt:** “Build the application and run E2E/integration tests. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/e2e-tester.md.”  
+   - If **PASSED**, go to Step 4 (Report to User).  
+   - If **FAILED**: go to step 3.5.4 (test rework cycle).
+
+4. **Test rework cycle (when any tester reported FAILED)**  
+   - **Increment** test_retry_count.  
+   - If test_retry_count **≥ 3**: run **test circuit breaker** (see “After 3 test retries” below); then go to Step 4.  
+   - **Identify affected tasks** from the plan by domain: frontend failure → tasks with assignee `frontend-worker`; backend failure → tasks with assignee `backend-worker`; E2E failure → all implementation tasks or those suggested by e2e-tester.  
+   - For each affected task (in execution order): call **Worker** with the task + “Test Result: FAILED” and the tester’s Failures/Suggested focus; then call **Reviewer** with the same task and changes.  
+   - If any review is FAILED, handle with the existing per-task rework_count (max 3 per task).  
+   - When all affected tasks have been reworked and reviewed (APPROVED), go back to step 3.5.1 (re-run frontend-tester, then backend-tester, then e2e-tester). Do not increment test_retry_count for review failures inside this cycle — only when a tester again reports FAILED.
+
 ### Step 4: Report to User
 
 - Summarize: feature name, which tasks were completed, which (if any) failed or were frozen.
+- Summarize test phase: frontend/backend/e2e PASSED or FAILED; if test circuit breaker triggered, which tester failed and after how many retries.
 - List important files changed and any manual verification steps.
 - If an ADR was suggested by Architect, mention it and the suggested file path.
 
@@ -142,6 +185,9 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 | Orchestrator → Worker | One task (title, description, scope, acceptance_criteria, expected_output) + architecture/contracts relevant to that task. |
 | Worker → Reviewer | Same task + architecture/contracts + description of changes (or diff). |
 | Reviewer → Worker (rework) | Same task + "Review Result: FAILED" and the list of issues. |
+| Orchestrator → Tester | Request to run tests and report PASSED/FAILED per .cursor/agents/<tester>.md. |
+| Tester → Orchestrator | Test Result: PASSED or FAILED; if FAILED, Summary, Failures (for Worker), Suggested focus. |
+| Orchestrator → Worker (test rework) | Affected task(s) + "Test Result: FAILED" + tester’s Failures and Suggested focus. |
 | Any phase → User | Final report; on conflict or circuit breaker, reason and next steps. |
 
 ---
@@ -152,7 +198,9 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 - **Planner returns clarification questions:** Return those questions to the user; resume after answer.
 - **Review FAILED (rework_count &lt; 3):** Increment rework_count for that task; send issues to Worker, retry same task (max 3 retries per task).
 - **Review FAILED (rework_count ≥ 3) — circuit breaker:** Do not retry. Apply “After 3 retries” and continue or report.
-- **Worker or Reviewer subagent unavailable:** Report to user that the assignee type is not available and list available subagent types.
+- **Test FAILED (test_retry_count &lt; 3):** Increment test_retry_count; rework affected tasks (Worker → Reviewer), then re-run test phase (frontend-tester → backend-tester → e2e-tester).
+- **Test FAILED (test_retry_count ≥ 3) — test circuit breaker:** Do not retry tests. Apply “After 3 test retries” and report to user.
+- **Worker, Reviewer, or Tester subagent unavailable:** Report to user that the assignee type is not available and list available subagent types.
 
 ### After 3 retries (circuit breaker for a task)
 
@@ -167,6 +215,15 @@ When a task has already had 3 retries and the review fails again (or rework_coun
 4. **Continue or stop:** By default, continue with the next task in the plan (if any) and include the frozen task in the final report. If the frozen task blocks the whole feature, report to the user and optionally pause the workflow so they can decide.
 5. **Report to user** — in the final summary list the frozen task, the failure summary, and the suggested next steps.
 
+### After 3 test retries (test circuit breaker)
+
+When the test phase has already been retried 3 times (test_retry_count ≥ 3) and a tester still reports FAILED:
+
+1. **Stop test rework** — do not call Workers or testers again for this test phase.
+2. **Summarize** — which tester failed (frontend/backend/e2e), last failure summary, and which tasks were reworked.
+3. **Suggest next steps** for the user (e.g. run tests locally, fix flaky tests, narrow scope, or reassess architecture).
+4. **Continue to Step 4** — include test failure and suggestion in the final report to the user.
+
 ---
 
 ## Checklist Before Starting the Workflow
@@ -180,6 +237,7 @@ When a task has already had 3 retries and the review fails again (or rework_coun
 ## Checklist Before Reporting to User
 
 - [ ] All completed tasks are listed with their outcomes.
-- [ ] Any frozen task has a short failure reason and suggestion.
+- [ ] Test phase result (PASSED or FAILED, and which tester if FAILED) is summarized.
+- [ ] Any frozen task or test circuit breaker has a short failure reason and suggestion.
 - [ ] ADR suggestion (if any) is mentioned.
 - [ ] Key files changed and manual verification steps are summarized.

@@ -47,7 +47,7 @@ You are the Planner Agent responsible for **creating the implementation plan** �
 - Each task must define **exact file scope** — no wildcards unless justified.
 - Tasks must **not overlap** in file scope (or be strictly sequenced).
 - **Dependencies must form a DAG** — no circular dependencies.
-- Use assignees that exist in the project’s Agent Registry (e.g. `frontend-worker`, `frontend-reviewer`, `backend-worker`, `backend-reviewer`).
+- Use assignees that exist in the project’s Agent Registry for **implementation** tasks only: `frontend-worker`, `backend-worker` (the Orchestrator calls the matching reviewer and, after all tasks, runs the test phase: frontend-tester, backend-tester, e2e-tester — you do not create separate “test tasks”).
 
 ## Execution patterns
 
