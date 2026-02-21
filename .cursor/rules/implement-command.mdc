@@ -9,7 +9,7 @@ When the user says **implement** or **implement: &lt;feature description&gt;** (
 
 1. **Apply** the skill **implement-feature** from `.cursor/skills/implement-feature/SKILL.md`.
 2. **Execute** the full workflow as **Orchestrator** (management only — you do not write code or create the plan):
-   - Optionally call **architect** (mcp_task, subagent_type: architect) for design.
+   - Optionally call **architect** (mcp_task, subagent_type: architect) for design — call for new API/module, new flow or screen with state, multiple modules; skip for single-file/component, one endpoint in existing module, small UI tweak or bugfix.
    - Call **planner** (mcp_task, subagent_type: planner) with the feature and optional architecture to get tasks and execution plan.
    - For each task in plan order: call the **worker** (by assignee), then the **reviewer**; on FAILED review rework up to 3 times, then escalate.
    - After all tasks: run **test phase** (frontend-tester → backend-tester → e2e-tester); on any FAILED, rework affected tasks (worker → reviewer) and re-run test phase up to 3 times, then test circuit breaker.

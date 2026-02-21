@@ -18,7 +18,7 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 
 ### Step 1 — Architect (optional)
 
-- **Call when:** Feature is non-trivial (new flows, new API, multiple modules). Skip for tiny UI tweaks or single-file changes.
+- **Call when:** Feature is non-trivial. Call for: new API module or API surface, new flow/screen with its own state, multiple modules affected, module/package boundary changes, new integration (e.g. auth, payment). **Skip** for: single-component or single-file change, one new endpoint in an existing module, tiny UI tweak, single bugfix.
 - **Pass:** Feature description; request full architectural design per `.cursor/agents/architect.md` (JSON output).
 - **After:** If `architecture_conflict: true`, report to user and stop. Otherwise keep architecture, constraints_for_orchestrator, contracts, steering_rules, risks.
 
@@ -27,10 +27,11 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 - **Pass:** Feature description; optionally full architecture (or summary) and note to use constraints_for_orchestrator and contracts.
 - **Request:** Task list and execution plan per `.cursor/agents/planner.md`: tasks with id, title, description, scope, depends_on, acceptance_criteria, expected_output, assignee, parallel_group.
 - **Keep:** tasks array and execution plan (order and parallel groups). The Orchestrator (you) does not create the plan — only call Planner and use its output.
+- **Validate plan:** Before executing, ensure each task has non-empty scope, assignee is in Agent Registry, and depends_on has no circular references. If not, ask Planner to fix or report to user.
 
 ### Step 3 — Execute tasks
 
-- Resolve order from the execution plan (respect depends_on and parallel_group). Same phase + same parallel_group → can run in parallel.
+- Resolve order from the execution plan (respect depends_on and parallel_group). **Parallel execution:** Tasks in the same phase with the same non-null `parallel_group` must be run in parallel (multiple mcp_task calls), then run the matching Reviewer for each. Other tasks run sequentially (Worker → Reviewer per task).
 - **Retry limit:** The Orchestrator maintains a **rework_count** per task (initial 0). Maximum **3 retries** per task; no infinite Worker ↔ Reviewer loops.
 - For **each task**:
   1. **Call Worker** — use Agent Registry to get `subagent_type` from task’s `assignee`. Pass task + architecture/contracts. Capture summary.
@@ -49,7 +50,7 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 - Summarize: feature name, completed tasks, any failed/frozen tasks.
 - Summarize **test phase**: frontend/backend/e2e PASSED or FAILED; if test circuit breaker triggered, which tester failed and after how many retries.
 - List important files changed and manual verification steps.
-- Mention ADR suggestion and path if Architect suggested one.
+- **ADR:** If the Architect suggested an ADR (`adr_candidate`), mention the suggested path (e.g. `docs/adr/ADR-0001-title.md`) and suggest the user create the file from `docs/adr/ADR-TEMPLATE.md`. ADRs live in `docs/adr/`; see `docs/adr/README.md` for when and how to add them.
 
 ## Agent Registry (Reference)
 
