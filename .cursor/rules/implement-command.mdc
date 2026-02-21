@@ -1,0 +1,17 @@
+---
+description: Run full implement workflow when user says "implement" or "implement: <feature>"
+alwaysApply: true
+---
+
+# Implement Command
+
+When the user says **implement** or **implement: &lt;feature description&gt;** (or an equivalent request to implement a feature end-to-end):
+
+1. **Apply** the skill **implement-feature** from `.cursor/skills/implement-feature/SKILL.md`.
+2. **Execute** the full workflow described there:
+   - Optionally call **architect** (mcp_task, subagent_type: architect) for design.
+   - Call **orchestrator** (mcp_task, subagent_type: orchestrator) to get tasks and execution plan.
+   - For each task in order: call the **worker** (by assignee), then the **reviewer**; on FAILED review rework up to 3 times, then escalate.
+   - Report the final summary to the user.
+
+Use the **Agent Registry** in the skill to map task `assignee` to `subagent_type` for each `mcp_task` call. Do not skip review steps or circuit breaker rules.
