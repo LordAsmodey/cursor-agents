@@ -131,8 +131,9 @@ Phase 3:
 
 Before finalizing, verify:
 
-- [ ] No circular dependencies
+- [ ] No circular dependencies in `depends_on`
 - [ ] Every task has non-empty `scope`
+- [ ] Every task has `assignee` that exists in the project’s Agent Registry (see implement-feature skill)
 - [ ] `scope` lists do not overlap between tasks (or tasks are strictly sequenced)
 - [ ] Acceptance criteria are verifiable (no vague "implement properly")
 - [ ] If architecture was provided, task order and assignees respect `constraints_for_orchestrator`

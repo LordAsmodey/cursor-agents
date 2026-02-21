@@ -94,7 +94,7 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 
 ### Step 1: Call Architect (Optional)
 
-- **When to call:** Feature is non-trivial (new flows, new API surface, new state, multiple modules). Skip for tiny UI tweaks or single-file changes.
+- **When to call:** Feature is non-trivial. **Call Architect** when: new API module or new API surface, new user flow or screen with its own state, multiple modules or packages affected, changes to module/package boundaries, new integration (e.g. auth, payment). **Skip Architect** when: single-component or single-file change, one new endpoint in an existing module, tiny UI tweak (styles, copy), single bugfix in existing code.
 - **Prompt to pass:** Feature description + request to produce the full architectural design per `.cursor/agents/architect.md` (overview, backend/frontend, contracts, constraints_for_orchestrator, steering_rules, risks). Ask for output in the JSON structure defined in architect.md.
 - **After call:**
   - If `architecture_conflict: true` → report to user with `conflict_reason` and `suggested_refactor`; stop workflow.
@@ -106,12 +106,13 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 - **Prompt:** Ask Planner to produce the task list and execution plan per `.cursor/agents/planner.md`: tasks with `id`, `title`, `description`, `scope`, `depends_on`, `acceptance_criteria`, `expected_output`, `assignee`, `parallel_group`. Request execution plan (phases and order).
 - **Output to keep:** `tasks` (array), execution plan (which task runs when, and which are parallel).
 - **You (Orchestrator) do not create the plan** — only call the Planner and use its output.
+- **Validate Planner output before executing:** For each task: (1) `scope` is non-empty, (2) `assignee` exists in the Agent Registry, (3) `depends_on` has no circular references (if you detect a cycle, ask Planner to fix or report to user). Reject or clarify with Planner if any task fails these checks.
 
 ### Step 3: Execute Tasks in Order
 
-- Resolve order from the execution plan (respect `depends_on` and `parallel_group`). Run tasks in phases: all tasks in the same phase with the same `parallel_group` can be launched in parallel via multiple `mcp_task` calls; others run sequentially.
+- Resolve order from the execution plan (respect `depends_on` and `parallel_group`). **Parallel execution:** Within one phase, all tasks that share the same non-null `parallel_group` value must be run **in parallel**: launch them with multiple `mcp_task` calls (one per task), wait for all to complete, then for each task call the matching Reviewer. Tasks with no `parallel_group` or with different `parallel_group` values run sequentially (one Worker → one Reviewer, then next task).
 - **Retry limit (Orchestrator):** You (Orchestrator) maintain a **rework_count** per task, initially **0**. This prevents infinite Worker ↔ Reviewer loops. Maximum **3 retries** per task: after the 1st FAILED review you may retry once, after the 2nd FAILED again, after the 3rd FAILED once more; after the 4th FAILED (or when rework_count would exceed 3) do not retry — run the circuit breaker. After each FAILED review for a task, **increment** that task’s rework_count before deciding to retry or break.
-- For **each task**:
+- For **each task** (or batch of tasks in the same `parallel_group`):
 
   1. **Call Worker (assignee)**  
      - `subagent_type` = value from Agent Registry for this task’s `assignee`.  
@@ -171,7 +172,7 @@ Run testers in order; maintain **test_retry_count** (initially **0**). Maximum *
 - Summarize: feature name, which tasks were completed, which (if any) failed or were frozen.
 - Summarize test phase: frontend/backend/e2e PASSED or FAILED; if test circuit breaker triggered, which tester failed and after how many retries.
 - List important files changed and any manual verification steps.
-- If an ADR was suggested by Architect, mention it and the suggested file path.
+- If the Architect suggested an ADR (`adr_candidate`), mention the suggested path (e.g. `docs/adr/ADR-0001-title.md`) and suggest the user create the file from `docs/adr/ADR-TEMPLATE.md`. ADRs live in `docs/adr/`; see `docs/adr/README.md` for when and how to add them.
 
 ---
 
