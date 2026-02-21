@@ -57,8 +57,16 @@ User: "implement: <feature>"
 └─────────────────────────────────────────────────────────┘
          │
          ▼
+┌─────────────────────────────────────────────────────────┐
+│ 3.6 DOCS PHASE (after test phase, before report)          │
+│    docs-writer: create/update ADR, README, docs/         │
+│    Input: feature summary, tasks, files changed,         │
+│    test result, optional adr_candidate from Architect    │
+└─────────────────────────────────────────────────────────┘
+         │
+         ▼
 ┌─────────────────┐
-│ 4. REPORT       │  Summarize: what was done, tests, files changed, failures
+│ 4. REPORT       │  Summarize: what was done, tests, docs, files changed, failures
 │    to User      │
 └─────────────────┘
 ```
@@ -78,10 +86,11 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 | frontend-tester    | frontend-tester   | Run frontend test suite       |
 | backend-tester     | backend-tester    | Run backend test suite        |
 | e2e-tester         | e2e-tester        | Build app + E2E/integration   |
+| —                  | docs-writer       | Create/update ADR, README, docs (after test phase) |
 | architect          | architect         | Produce architecture design   |
 | planner            | planner           | Create tasks + execution plan |
 
-**Adding agents:** Define new assignees in Architect and Planner outputs (e.g. `test-runner`, `docs-writer`), add corresponding rows here and ensure those subagent types exist in the environment. Testers are invoked by the Orchestrator during the Test Phase, not by task assignee.
+**Adding agents:** Define new assignees in Architect and Planner outputs (e.g. `test-runner`), add corresponding rows here and ensure those subagent types exist in the environment. Testers and docs-writer are invoked by the Orchestrator during the Test Phase and Docs Phase respectively, not by task assignee.
 
 ---
 
@@ -156,23 +165,39 @@ Run testers in order; maintain **test_retry_count** (initially **0**). Maximum *
 3. **Call e2e-tester**  
    - `subagent_type` = `e2e-tester`.  
    - **Prompt:** “Build the application and run E2E/integration tests. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/e2e-tester.md.”  
-   - If **PASSED**, go to Step 4 (Report to User).  
+   - If **PASSED**, go to Step 3.6 (Docs Phase).  
    - If **FAILED**: go to step 3.5.4 (test rework cycle).
 
 4. **Test rework cycle (when any tester reported FAILED)**  
    - **Increment** test_retry_count.  
-   - If test_retry_count **≥ 3**: run **test circuit breaker** (see “After 3 test retries” below); then go to Step 4.  
+   - If test_retry_count **≥ 3**: run **test circuit breaker** (see “After 3 test retries” below); then go to Step 3.6 (Docs Phase).  
    - **Identify affected tasks** from the plan by domain: frontend failure → tasks with assignee `frontend-worker`; backend failure → tasks with assignee `backend-worker`; E2E failure → all implementation tasks or those suggested by e2e-tester.  
    - For each affected task (in execution order): call **Worker** with the task + “Test Result: FAILED” and the tester’s Failures/Suggested focus; then call **Reviewer** with the same task and changes.  
    - If any review is FAILED, handle with the existing per-task rework_count (max 3 per task).  
    - When all affected tasks have been reworked and reviewed (APPROVED), go back to step 3.5.1 (re-run frontend-tester, then backend-tester, then e2e-tester). Do not increment test_retry_count for review failures inside this cycle — only when a tester again reports FAILED.
 
+### Step 3.6: Docs Phase (after test phase, before report)
+
+Call **docs-writer** once to create or update documentation. No retry loop; if the subagent is unavailable, note in the report and continue.
+
+1. **Call docs-writer**  
+   - `subagent_type` = `docs-writer`.  
+   - **Prompt:** Include:  
+     - Feature name/summary; list of completed tasks (id, title, short outcome); key files changed; test phase result (PASSED or FAILED).  
+     - Optional: architecture summary (overview, main contracts).  
+     - Optional: `adr_candidate` from Architect output if present (e.g. `{ "title": "ADR-0001: Short title", "suggest_file": "docs/adr/ADR-0001-title.md" }`).  
+     - Instruction: “Create or update documentation per .cursor/agents/docs-writer.md. Output Docs Result: DONE or SKIPPED with Summary and files created/updated.”  
+   - Capture the docs-writer’s output (Summary, Files created, Files updated, Notes).  
+   - If docs-writer subagent is unavailable, skip this step and note “Documentation phase skipped (docs-writer not available).” in the report.  
+2. **Proceed to Step 4** with the docs summary (or skip note) for inclusion in the final report.
+
 ### Step 4: Report to User
 
 - Summarize: feature name, which tasks were completed, which (if any) failed or were frozen.
 - Summarize test phase: frontend/backend/e2e PASSED or FAILED; if test circuit breaker triggered, which tester failed and after how many retries.
+- Summarize docs phase: what docs-writer did (files created/updated) or that it was skipped; if Architect had suggested an ADR and docs-writer created it, mention the path (e.g. `docs/adr/ADR-0001-title.md`).
 - List important files changed and any manual verification steps.
-- If the Architect suggested an ADR (`adr_candidate`), mention the suggested path (e.g. `docs/adr/ADR-0001-title.md`) and suggest the user create the file from `docs/adr/ADR-TEMPLATE.md`. ADRs live in `docs/adr/`; see `docs/adr/README.md` for when and how to add them.
+- If Architect suggested an ADR but docs-writer did not create it (e.g. unavailable), mention the suggested path and that the user can create the file from `docs/adr/ADR-TEMPLATE.md`. See `docs/adr/README.md` for when and how to add ADRs.
 
 ---
 
@@ -189,6 +214,8 @@ Run testers in order; maintain **test_retry_count** (initially **0**). Maximum *
 | Orchestrator → Tester | Request to run tests and report PASSED/FAILED per .cursor/agents/<tester>.md. |
 | Tester → Orchestrator | Test Result: PASSED or FAILED; if FAILED, Summary, Failures (for Worker), Suggested focus. |
 | Orchestrator → Worker (test rework) | Affected task(s) + "Test Result: FAILED" + tester’s Failures and Suggested focus. |
+| Orchestrator → docs-writer | Feature summary, completed tasks, key files changed, test phase result, optional architecture summary, optional adr_candidate. |
+| docs-writer → Orchestrator | Docs Result: DONE or SKIPPED; Summary; Files created/updated; Notes. |
 | Any phase → User | Final report; on conflict or circuit breaker, reason and next steps. |
 
 ---
@@ -239,6 +266,7 @@ When the test phase has already been retried 3 times (test_retry_count ≥ 3) an
 
 - [ ] All completed tasks are listed with their outcomes.
 - [ ] Test phase result (PASSED or FAILED, and which tester if FAILED) is summarized.
+- [ ] Docs phase result (what docs-writer created/updated, or that it was skipped) is summarized.
 - [ ] Any frozen task or test circuit breaker has a short failure reason and suggestion.
-- [ ] ADR suggestion (if any) is mentioned.
+- [ ] ADR suggestion or created ADR path (if any) is mentioned.
 - [ ] Key files changed and manual verification steps are summarized.

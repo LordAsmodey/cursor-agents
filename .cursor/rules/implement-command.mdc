@@ -13,6 +13,7 @@ When the user says **implement** or **implement: &lt;feature description&gt;** (
    - Call **planner** (mcp_task, subagent_type: planner) with the feature and optional architecture to get tasks and execution plan.
    - For each task in plan order: call the **worker** (by assignee), then the **reviewer**; on FAILED review rework up to 3 times, then escalate.
    - After all tasks: run **test phase** (frontend-tester → backend-tester → e2e-tester); on any FAILED, rework affected tasks (worker → reviewer) and re-run test phase up to 3 times, then test circuit breaker.
-   - Report the final summary to the user (including test phase result).
+   - After test phase: run **docs phase** (docs-writer) with feature summary, tasks, files changed, test result, optional adr_candidate; include docs result in the report.
+   - Report the final summary to the user (including test phase and docs phase result).
 
 Use the **Agent Registry** in the skill to map task `assignee` to `subagent_type` for each `mcp_task` call. Do not skip review steps or circuit breaker rules.
