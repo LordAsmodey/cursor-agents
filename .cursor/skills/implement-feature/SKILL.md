@@ -64,10 +64,12 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 |--------------------|-------------------|-------------------------------|
 | frontend-worker    | frontend-worker   | Implement frontend task       |
 | frontend-reviewer  | frontend-reviewer | Review frontend changes       |
+| backend-worker     | backend-worker    | Implement backend task        |
+| backend-reviewer   | backend-reviewer  | Review backend changes        |
 | architect          | architect         | Produce architecture design   |
 | planner            | planner           | Create tasks + execution plan |
 
-**Adding agents:** Define new assignees in Architect and Planner outputs (e.g. `backend-worker`, `backend-reviewer`), add corresponding rows here and ensure those subagent types exist in the environment.
+**Adding agents:** Define new assignees in Architect and Planner outputs (e.g. `test-runner`, `docs-writer`), add corresponding rows here and ensure those subagent types exist in the environment.
 
 ---
 
@@ -107,11 +109,11 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
      - Capture the agent’s summary (files changed, key decisions).
 
   2. **Call Reviewer**  
-     - Use the reviewer that matches the domain (e.g. frontend-reviewer for frontend-worker tasks).  
+     - Use the reviewer that matches the domain: `frontend-reviewer` for `frontend-worker` tasks, `backend-reviewer` for `backend-worker` tasks.  
      - **Prompt:** Include:
        - The same task (acceptance_criteria, scope)
        - Architecture plan / contracts (so reviewer can check compliance)
-       - Request: "Review the changes made for this task (see attached context / diff). Output either APPROVED or FAILED with issues as in .cursor/agents/frontend-reviewer.md."
+       - Request: "Review the changes made for this task (see attached context / diff). Output either APPROVED or FAILED with issues as in .cursor/agents/<domain>-reviewer.md (e.g. frontend-reviewer.md or backend-reviewer.md)."
 
   3. **If review result is APPROVED**  
      - Mark task done; continue to the next task (or phase).

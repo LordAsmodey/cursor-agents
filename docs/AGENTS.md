@@ -11,6 +11,8 @@ This document describes each agent in the system. It is intended for both humans
 | **planner** | Create task list and execution plan from feature + optional architecture | After (optional) Architect; invoked by Orchestrator |
 | **frontend-worker** | Implement a single frontend task (React/Next.js/TypeScript) | Per task with assignee `frontend-worker` |
 | **frontend-reviewer** | Review frontend changes for scope, types, SSR, performance, a11y | After each frontend-worker task |
+| **backend-worker** | Implement a single backend task (API, services, DTOs, validation, DB) | Per task with assignee `backend-worker` |
+| **backend-reviewer** | Review backend changes for contracts, validation, security, scope | After each backend-worker task |
 
 ## Architect
 
@@ -43,9 +45,21 @@ This document describes each agent in the system. It is intended for both humans
 - **Does not:** Rewrite code, introduce new architecture, implement features, modify files.
 - **Output:** Either `APPROVED` (with short summary) or `FAILED` with a list of issues (what’s wrong, why it matters, how to fix).
 
+## Backend Worker
+
+- **Does:** Implements one scoped backend task per architecture plan and acceptance criteria: API endpoints, services, DTOs, validation, data layer. Uses existing patterns (Nest/Express/Fastify), validation, and error handling.
+- **Does not:** Change architecture or API contracts, modify out-of-scope files, refactor unrelated code, expose secrets or PII.
+- **Context:** Reads `.cursor/rules/`; follows existing project structure and API contracts.
+
+## Backend Reviewer
+
+- **Does:** Reviews submitted backend changes for architecture and API contract compliance, validation, error handling, security (injection, auth, no secrets in responses), database usage, and scope.
+- **Does not:** Rewrite code, introduce new architecture, implement features, modify files.
+- **Output:** Either `APPROVED` (with short summary) or `FAILED` with a list of issues (what's wrong, why it matters, how to fix).
+
 ## Adding New Agents
 
-1. Add a new agent definition file under `.cursor/agents/` (e.g. `backend-worker.md`, `backend-reviewer.md`).
+1. Add a new agent definition file under `.cursor/agents/` (e.g. `test-runner.md`, `docs-writer.md`).
 2. In the implement-feature skill’s **Agent Registry**, add a row mapping the new assignee to the new `subagent_type`.
-3. In Architect and Planner instructions/outputs, use the new assignee (e.g. `backend-worker`, `backend-reviewer`) for backend tasks.
+3. In Architect and Planner instructions/outputs, use the new assignee for the corresponding tasks.
 4. Ensure your Cursor/environment supports the new `subagent_type` in `mcp_task` (or equivalent) so the coordinator can invoke the new agent.

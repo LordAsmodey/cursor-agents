@@ -69,13 +69,13 @@ User: "implement: <feature>"
 
 - **Input:** One task (title, description, scope, acceptance_criteria, expected_output) plus relevant architecture/contracts.
 - **Output:** Implementation summary (files changed, decisions).
-- One worker type per domain (e.g. frontend-worker; backend-worker when added).
+- One worker type per domain (e.g. frontend-worker, backend-worker).
 
 ### Reviewers
 
 - **Input:** Same task, architecture/contracts, and description of changes (or diff).
 - **Output:** `APPROVED` or `FAILED` with a list of issues.
-- One reviewer per domain (e.g. frontend-reviewer; backend-reviewer when added).
+- One reviewer per domain (e.g. frontend-reviewer, backend-reviewer).
 
 ## Context Handoffs
 
@@ -95,7 +95,7 @@ The implement-feature skill keeps an **Agent Registry** table that maps:
 
 - Task `assignee` (string from **Planner** output) → `subagent_type` (string for `mcp_task`).
 
-When you add new agents (e.g. backend-worker), add a row to that table and use the same assignee in Architect and Planner outputs so the Orchestrator can dispatch correctly.
+When you add new agents (e.g. test-runner, docs-writer), add a row to that table and use the same assignee in Architect and Planner outputs so the Orchestrator can dispatch correctly.
 
 ## Failure Handling
 

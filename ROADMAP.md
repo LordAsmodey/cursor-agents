@@ -12,22 +12,24 @@ This document is a living roadmap and todo list: which agents and capabilities a
 | Orchestrator agent | Done | `.cursor/agents/orchestrator.md` |
 | Frontend Worker | Done | `.cursor/agents/frontend-worker.md` |
 | Frontend Reviewer | Done | `.cursor/agents/frontend-reviewer.md` |
+| Backend Worker | Done | `.cursor/agents/backend-worker.md` |
+| Backend Reviewer | Done | `.cursor/agents/backend-reviewer.md` |
 | Implement-feature skill | Done | Full workflow: design → decompose → implement → review |
 | Implement rule | Done | Triggers skill on "implement" / "implement: &lt;feature&gt;" |
-| Agent Registry | Done | Maps assignee → subagent_type (frontend only so far) |
+| Agent Registry | Done | Maps assignee → subagent_type (frontend + backend) |
 | Documentation | Done | README, docs/ARCHITECTURE, AGENTS, WORKFLOW |
 
 ---
 
-## 1. Backend Agents (High Priority)
+## 1. Backend Agents (Done)
 
-The Architect and Orchestrator already assume backend work; the workflow currently has **no dedicated backend implementer or reviewer**.
+Backend worker and reviewer are implemented; Architect and Orchestrator use assignees `backend-worker` and `backend-reviewer` for backend tasks.
 
 | Item | Description | Deliverable |
 |------|-------------|-------------|
-| **backend-worker** | Agent that implements a single backend task (e.g. Nest/Express module, controller, service, DTOs, tests) within given scope and contracts. | `.cursor/agents/backend-worker.md`; add to Agent Registry; document in docs/AGENTS.md. |
-| **backend-reviewer** | Agent that reviews backend changes for architecture compliance, types, error handling, security, tests, scope. | `.cursor/agents/backend-reviewer.md`; add to Agent Registry; document in docs/AGENTS.md. |
-| **Orchestrator/Architect alignment** | Ensure Architect and Orchestrator use assignees `backend-worker` and `backend-reviewer` for backend tasks and that scope/contracts are backend-friendly. | Updates in architect.md / orchestrator.md if needed. |
+| **backend-worker** | Agent that implements a single backend task (e.g. Nest/Express module, controller, service, DTOs) within given scope and contracts. | Done: `.cursor/agents/backend-worker.md`; in Agent Registry; docs/AGENTS.md. |
+| **backend-reviewer** | Agent that reviews backend changes for architecture compliance, types, error handling, security, scope. | Done: `.cursor/agents/backend-reviewer.md`; in Agent Registry; docs/AGENTS.md. |
+| **Orchestrator/Architect alignment** | Architect and Orchestrator use assignees `backend-worker` and `backend-reviewer` for backend tasks. | Done: SKILL.md, orchestrator.md, planner.md, architect.md. |
 
 ---
 
@@ -73,8 +75,8 @@ End-to-end quality gates are not yet automated in the workflow.
 
 ## 6. Suggested Implementation Order
 
-1. **Backend Worker + Backend Reviewer** — Unblocks full-stack "implement" flows.
-2. **Agent Registry + docs update** — Register new agents and document them.
+1. ~~**Backend Worker + Backend Reviewer**~~ — Done; full-stack "implement" flows supported.
+2. **Agent Registry + docs update** — Register any future agents (test-runner, docs-writer) and document them.
 3. **Lint/format in workflow** — Quick win for quality.
 4. **Test-runner (or test step)** — After backend is in place, add test execution to the loop.
 5. **CI hints / DevOps** — Once tasks and scope are stable.
@@ -84,11 +86,11 @@ End-to-end quality gates are not yet automated in the workflow.
 
 ## 7. Todo Checklist (Copy and Use)
 
-- [ ] Add `backend-worker` agent (`.cursor/agents/backend-worker.md`)
-- [ ] Add `backend-reviewer` agent (`.cursor/agents/backend-reviewer.md`)
-- [ ] Register backend agents in implement-feature skill Agent Registry
-- [ ] Update Architect/Orchestrator to use `backend-worker` / `backend-reviewer` for backend tasks
-- [ ] Update docs/AGENTS.md with backend agents
+- [x] Add `backend-worker` agent (`.cursor/agents/backend-worker.md`)
+- [x] Add `backend-reviewer` agent (`.cursor/agents/backend-reviewer.md`)
+- [x] Register backend agents in implement-feature skill Agent Registry
+- [x] Update Architect/Orchestrator to use `backend-worker` / `backend-reviewer` for backend tasks
+- [x] Update docs/AGENTS.md with backend agents
 - [ ] Define lint/format step in workflow (rule or skill)
 - [ ] Add `docs/adr/` and ADR template (optional)
 - [ ] Design and add test-runner or test step (optional)

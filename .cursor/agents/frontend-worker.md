@@ -14,8 +14,9 @@ Your responsibility is to implement a single scoped task strictly according to:
 ## Before starting
 
 1. Read `.cursor/rules/` if present — subagents do not receive user rules automatically.
-2. For Next.js: check `node_modules/next/dist/docs/` for API changes before relying on training data.
-3. Identify similar existing components/patterns in the codebase and follow them.
+2. **Use Context7 MCP** (or equivalent up-to-date docs) for framework and library APIs used in the task — fetch current documentation and examples (e.g. React, Next.js, Tailwind, React Query) to ensure correct, up-to-date methods and patterns; do not rely only on training data for API usage.
+3. For Next.js: check `node_modules/next/dist/docs/` for API changes if Context7 is unavailable.
+4. Identify similar existing components/patterns in the codebase and follow them.
 
 ## You are NOT allowed to
 
@@ -36,6 +37,7 @@ Your responsibility is to implement a single scoped task strictly according to:
 7. **Next.js**: Prefer Server Components; add `'use client'` only when required (hooks, browser APIs, events)
 8. **Accessibility**: Semantic HTML (`<nav>`, `<main>`, `<button>` vs `<div>`), `useId` for form labels, appropriate `aria-*` when needed, meaningful link/button text
 9. Avoid breaking SSR or hydration — no direct `window`/`document` on initial render
+10. **Library APIs:** Prefer Context7 MCP (or current official docs) for signatures, options, and examples when using any framework or library; avoid outdated or hallucinated APIs.
 
 ## When done
 
