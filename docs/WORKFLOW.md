@@ -38,9 +38,16 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
   3. If **APPROVED** → mark task done, continue.
   4. If **FAILED** → Orchestrator increments this task's rework_count. If rework_count &lt; 3 → send issues to same Worker, repeat from step 1 for this task. If rework_count ≥ 3 → **circuit breaker**: freeze task, summarize failure, suggest next steps (decompose, reassess, or manual fix), then continue with next task or report to user; do not retry this task again.
 
+### Step 3.5 — Test phase (after all implementation tasks)
+
+- Run testers in order: **frontend-tester** → **backend-tester** → **e2e-tester** (build + E2E/integration).
+- Orchestrator maintains **test_retry_count** (initial 0). Maximum **3 test retry cycles**.
+- If any tester reports **FAILED**: increment test_retry_count; if test_retry_count &lt; 3, identify affected tasks by domain (frontend failure → frontend-worker tasks; backend → backend-worker; E2E → all or as suggested), rework them (Worker → Reviewer), then re-run the test phase. If test_retry_count ≥ 3 → **test circuit breaker**: stop test rework, summarize which tester failed, suggest next steps, include in final report.
+
 ### Step 4 — Report to user
 
 - Summarize: feature name, completed tasks, any failed/frozen tasks.
+- Summarize **test phase**: frontend/backend/e2e PASSED or FAILED; if test circuit breaker triggered, which tester failed and after how many retries.
 - List important files changed and manual verification steps.
 - Mention ADR suggestion and path if Architect suggested one.
 
@@ -52,10 +59,13 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 | frontend-reviewer | frontend-reviewer | Review frontend changes |
 | backend-worker | backend-worker | Implement backend task |
 | backend-reviewer | backend-reviewer | Review backend changes |
+| — | frontend-tester | Run frontend test suite |
+| — | backend-tester | Run backend test suite |
+| — | e2e-tester | Build app + E2E/integration |
 | architect | architect | Produce architecture design |
 | planner | planner | Create tasks + execution plan |
 
-When new agents are added (e.g. test-runner, docs-writer), extend this table in the skill and use the same assignees in Planner output.
+Testers are invoked by the Orchestrator during the test phase (not by task assignee). When new implementation agents are added, extend this table in the skill and use the same assignees in Planner output.
 
 ## Checklist Before Starting
 
@@ -66,6 +76,7 @@ When new agents are added (e.g. test-runner, docs-writer), extend this table in 
 ## Checklist Before Reporting
 
 - All completed tasks listed with outcomes.
-- Any frozen task has a short failure reason and suggestion.
+- Test phase result (PASSED or FAILED, and which tester if FAILED) summarized.
+- Any frozen task or test circuit breaker has a short failure reason and suggestion.
 - ADR suggestion (if any) mentioned.
 - Key files changed and manual verification steps summarized.
