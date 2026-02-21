@@ -98,6 +98,7 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 ### Step 3: Execute Tasks in Order
 
 - Resolve order from the execution plan (respect `depends_on` and `parallel_group`). Run tasks in phases: all tasks in the same phase with the same `parallel_group` can be launched in parallel via multiple `mcp_task` calls; others run sequentially.
+- **Retry limit (Orchestrator):** You (Orchestrator) maintain a **rework_count** per task, initially **0**. This prevents infinite Worker ↔ Reviewer loops. Maximum **3 retries** per task: after the 1st FAILED review you may retry once, after the 2nd FAILED again, after the 3rd FAILED once more; after the 4th FAILED (or when rework_count would exceed 3) do not retry — run the circuit breaker. After each FAILED review for a task, **increment** that task’s rework_count before deciding to retry or break.
 - For **each task**:
 
   1. **Call Worker (assignee)**  
@@ -119,8 +120,9 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
      - Mark task done; continue to the next task (or phase).
 
   4. **If review result is FAILED**  
-     - If rework count for this task **&lt; 3**: pass the reviewer’s issues back to the same Worker (same task, plus list of issues to fix). Increment rework count; go to step 3.1 for this task again.  
-     - If rework count **≥ 3**: run **circuit breaker**: freeze the task, summarize failure (task id, repeated issues), suggest "architectural reassessment or recursive decomposition" per orchestrator.md. Report to user and stop or pause workflow (do not auto-retry further).
+     - **Increment** this task’s rework_count (Orchestrator keeps the count).  
+     - If rework_count for this task **&lt; 3**: pass the reviewer’s issues back to the same Worker (same task + list of issues to fix) and go to step 3.1 for this task again.  
+     - If rework_count **≥ 3**: run **circuit breaker** for this task (see “After 3 retries” below); then continue with the next task or report to user — do not retry this task again.
 
 ### Step 4: Report to User
 
@@ -148,9 +150,22 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 
 - **Architect returns architecture_conflict:** Stop; report `conflict_reason` and `suggested_refactor` to user.
 - **Planner returns clarification questions:** Return those questions to the user; resume after answer.
-- **Review FAILED &lt;= 3 times:** Send issues to Worker, retry same task.
-- **Review FAILED 4th time (circuit breaker):** Freeze task, write short failure analysis, suggest decomposition or architecture reassessment, report to user.
-- **Worker or Reviewer subagent unavailable:** Report to user that the assignee type is not available and list available subagent types so they can adjust agents or task assignees.
+- **Review FAILED (rework_count &lt; 3):** Increment rework_count for that task; send issues to Worker, retry same task (max 3 retries per task).
+- **Review FAILED (rework_count ≥ 3) — circuit breaker:** Do not retry. Apply “After 3 retries” and continue or report.
+- **Worker or Reviewer subagent unavailable:** Report to user that the assignee type is not available and list available subagent types.
+
+### After 3 retries (circuit breaker for a task)
+
+When a task has already had 3 retries and the review fails again (or rework_count ≥ 3):
+
+1. **Freeze the task** — mark it as failed/frozen; do not call the Worker again for this task.
+2. **Summarize failure** — task id, title, and a short summary of recurring issues from the last (or all) review(s).
+3. **Suggest next steps** for the user (pick as appropriate):
+   - Re-run the feature with a narrower scope or after architectural reassessment (e.g. call Architect again).
+   - Decompose the task into smaller subtasks (e.g. call Planner again with “split task TASK-X”).
+   - Fix the task manually and continue; or skip and proceed with the rest of the plan.
+4. **Continue or stop:** By default, continue with the next task in the plan (if any) and include the frozen task in the final report. If the frozen task blocks the whole feature, report to the user and optionally pause the workflow so they can decide.
+5. **Report to user** — in the final summary list the frozen task, the failure summary, and the suggested next steps.
 
 ---
 

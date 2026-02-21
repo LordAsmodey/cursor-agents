@@ -31,12 +31,12 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 ### Step 3 — Execute tasks
 
 - Resolve order from the execution plan (respect depends_on and parallel_group). Same phase + same parallel_group → can run in parallel.
+- **Retry limit:** The Orchestrator maintains a **rework_count** per task (initial 0). Maximum **3 retries** per task; no infinite Worker ↔ Reviewer loops.
 - For **each task**:
   1. **Call Worker** — use Agent Registry to get `subagent_type` from task’s `assignee`. Pass task + architecture/contracts. Capture summary.
   2. **Call Reviewer** — use reviewer that matches the domain (e.g. frontend-reviewer for frontend-worker, backend-reviewer for backend-worker). Pass task + architecture/contracts + changes. Get APPROVED or FAILED.
   3. If **APPROVED** → mark task done, continue.
-  4. If **FAILED** and rework count &lt; 3 → send issues to same Worker, increment rework, repeat from 3.1.
-  5. If **FAILED** and rework count ≥ 3 → **circuit breaker**: freeze task, summarize failure, suggest decomposition or architecture reassessment, report to user; do not retry.
+  4. If **FAILED** → Orchestrator increments this task's rework_count. If rework_count &lt; 3 → send issues to same Worker, repeat from step 1 for this task. If rework_count ≥ 3 → **circuit breaker**: freeze task, summarize failure, suggest next steps (decompose, reassess, or manual fix), then continue with next task or report to user; do not retry this task again.
 
 ### Step 4 — Report to user
 

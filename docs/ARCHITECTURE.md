@@ -34,7 +34,7 @@ User: "implement: <feature>"
 │    └─────┬──────┘         └───────┬────────┘                  │
 │          │ FAILED ≤3              │ APPROVED                   │
 │          └────────────────────────┘ → next task                │
-│          │ FAILED >3 → circuit breaker → escalate             │
+│          │ FAILED, rework_count≥3 → circuit breaker → freeze, next task or report │
 └──────────────────────────────────────────────────────────────┘
            │
            ▼

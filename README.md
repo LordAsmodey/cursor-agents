@@ -23,7 +23,7 @@ Agents are invoked via Cursor’s `mcp_task` (or equivalent) by an executing age
 | **Workers** | Implement a single scoped task (e.g. `frontend-worker`, `backend-worker`). |
 | **Reviewers** | Review changes for scope, architecture compliance, and quality (e.g. `frontend-reviewer`, `backend-reviewer`). |
 | **Agent Registry** | Maps task `assignee` (from Planner) → `subagent_type` so the Orchestrator knows which agent to call. |
-| **Circuit breaker** | After 3 failed review iterations for a task, the workflow freezes it and escalates instead of retrying. |
+| **Circuit breaker** | The Orchestrator keeps a rework_count per task (max 3 retries). After 3 retries, the task is frozen, summarized, and next steps are suggested; no infinite Worker↔Reviewer loops. |
 
 ## Project Structure
 
