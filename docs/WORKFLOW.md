@@ -22,11 +22,11 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 - **Pass:** Feature description; request full architectural design per `.cursor/agents/architect.md` (JSON output).
 - **After:** If `architecture_conflict: true`, report to user and stop. Otherwise keep architecture, constraints_for_orchestrator, contracts, steering_rules, risks.
 
-### Step 2 — Orchestrator
+### Step 2 — Planner
 
 - **Pass:** Feature description; optionally full architecture (or summary) and note to use constraints_for_orchestrator and contracts.
-- **Request:** Task list and execution plan per `.cursor/agents/orchestrator.md`: tasks with id, title, description, scope, depends_on, acceptance_criteria, expected_output, assignee, parallel_group.
-- **Keep:** tasks array and execution plan (order and parallel groups).
+- **Request:** Task list and execution plan per `.cursor/agents/planner.md`: tasks with id, title, description, scope, depends_on, acceptance_criteria, expected_output, assignee, parallel_group.
+- **Keep:** tasks array and execution plan (order and parallel groups). The Orchestrator (you) does not create the plan — only call Planner and use its output.
 
 ### Step 3 — Execute tasks
 
@@ -51,9 +51,9 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 | frontend-worker | frontend-worker | Implement frontend task |
 | frontend-reviewer | frontend-reviewer | Review frontend changes |
 | architect | architect | Produce architecture design |
-| orchestrator | orchestrator | Decompose into tasks |
+| planner | planner | Create tasks + execution plan |
 
-When new agents are added (e.g. backend-worker, backend-reviewer), extend this table in the skill and use the same assignees in Orchestrator output.
+When new agents are added (e.g. backend-worker, backend-reviewer), extend this table in the skill and use the same assignees in Planner output.
 
 ## Checklist Before Starting
 

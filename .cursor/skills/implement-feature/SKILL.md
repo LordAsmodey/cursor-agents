@@ -1,11 +1,11 @@
 ---
 name: implement-feature
-description: Runs the full feature implementation workflow: design (Architect), task decomposition (Orchestrator), implementation and review per task (Worker → Reviewer), with handbacks and circuit breakers. Use when the user says "implement", "implement: <feature>", or requests to implement a feature end-to-end using project agents.
+description: Runs the full feature implementation workflow: design (Architect), plan creation (Planner), then execution per task (Worker → Reviewer) driven by the Orchestrator. The executing agent acts as Orchestrator (management only); it does not write code or the plan. Use when the user says "implement", "implement: <feature>", or requests to implement a feature end-to-end using project agents.
 ---
 
 # Implement Feature — Full Workflow
 
-This skill defines the end-to-end workflow for implementing a feature using project agents. The **executing agent** (the one reading this skill) coordinates subagents via `mcp_task` and passes context between phases.
+This skill defines the end-to-end workflow for implementing a feature using project agents. The **executing agent** acts as **Orchestrator**: it coordinates subagents via `mcp_task`, decides who to call (Architect, Planner, Workers, Reviewers), and passes context between phases. It does **not** write code or create the implementation plan — the **Planner** creates the plan.
 
 ---
 
@@ -18,32 +18,33 @@ This skill defines the end-to-end workflow for implementing a feature using proj
 
 ## High-Level Flow
 
+The **Orchestrator** (you, the executing agent) only manages: you decide whom to call and what to pass. The **Planner** produces the task list and execution plan; you never write the plan yourself.
+
 ```
 User: "implement: <feature>"
     │
     ▼
 ┌─────────────────┐
-│ 1. ARCHITECT    │  (optional: skip if feature is trivial or design already exists)
+│ 1. ARCHITECT    │  (optional: Orchestrator decides; skip if trivial)
 │    Design       │  → architecture design (JSON), constraints_for_orchestrator
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ 2. ORCHESTRATOR │  Input: feature + (architecture or none)
-│    Decompose    │  → list of tasks with scope, assignee, acceptance_criteria
+│ 2. PLANNER      │  Input: feature + (architecture or none)
+│    Create plan  │  → tasks[], execution plan (assignee, scope, order)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────────────────────────────────────────────┐
-│ 3. FOR EACH TASK (in dependency order / parallel groups) │
+│ 3. ORCHESTRATOR executes plan: FOR EACH TASK (in order)  │
 │    ┌──────────────┐    ┌────────────────┐               │
 │    │ WORKER       │ →  │ REVIEWER       │               │
-│    │ (implement)  │    │ (review)       │               │
+│    │ (assignee)   │    │ (matching)     │               │
 │    └──────┬───────┘    └───────┬────────┘               │
-│           │                    │                         │
 │           │  FAILED (≤3 tries) │  APPROVED               │
-│           └────────────────────┘ → next task or done    │
-│           │  FAILED (>3) → escalate to user             │
+│           └────────────────────┘ → next task or done     │
+│           │  FAILED (>3) → circuit breaker → user        │
 └─────────────────────────────────────────────────────────┘
          │
          ▼
@@ -57,16 +58,16 @@ User: "implement: <feature>"
 
 ## Agent Registry (Extensible)
 
-Map task `assignee` from Orchestrator output to `subagent_type` for `mcp_task`. When you add new agents (e.g. backend-worker), add a row here and use the same assignee in architecture/orchestrator outputs.
+Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. The Orchestrator (you) calls Architect and Planner explicitly; for execution you use this table to dispatch Workers and Reviewers by assignee.
 
-| assignee           | subagent_type   | Role                          |
-|--------------------|-----------------|-------------------------------|
-| frontend-worker     | frontend-worker | Implement frontend task       |
-| frontend-reviewer   | frontend-reviewer | Review frontend changes    |
-| architect           | architect       | Produce architecture design   |
-| orchestrator        | orchestrator    | Decompose into tasks          |
+| assignee           | subagent_type     | Role                          |
+|--------------------|-------------------|-------------------------------|
+| frontend-worker    | frontend-worker   | Implement frontend task       |
+| frontend-reviewer  | frontend-reviewer | Review frontend changes       |
+| architect          | architect         | Produce architecture design   |
+| planner            | planner           | Create tasks + execution plan |
 
-**Adding agents:** Define new assignees in Architect/Orchestrator (e.g. `backend-worker`, `backend-reviewer`), add corresponding rows to this table and ensure those subagent types exist in the environment.
+**Adding agents:** Define new assignees in Architect and Planner outputs (e.g. `backend-worker`, `backend-reviewer`), add corresponding rows here and ensure those subagent types exist in the environment.
 
 ---
 
@@ -85,11 +86,12 @@ Map task `assignee` from Orchestrator output to `subagent_type` for `mcp_task`. 
   - If `architecture_conflict: true` → report to user with `conflict_reason` and `suggested_refactor`; stop workflow.
   - Otherwise keep: `architecture` (full design), `constraints_for_orchestrator`, `contracts`, `steering_rules`, `risks`.
 
-### Step 2: Call Orchestrator
+### Step 2: Call Planner
 
 - **Input to pass:** Feature description; optionally full architecture output (or summary) and explicit note: "Use constraints_for_orchestrator and contracts from the architecture if provided."
-- **Prompt:** Ask Orchestrator to produce the task list and execution plan per `.cursor/agents/orchestrator.md`: tasks with `id`, `title`, `description`, `scope`, `depends_on`, `acceptance_criteria`, `expected_output`, `assignee`, `parallel_group`. Request execution plan (phases and order).
+- **Prompt:** Ask Planner to produce the task list and execution plan per `.cursor/agents/planner.md`: tasks with `id`, `title`, `description`, `scope`, `depends_on`, `acceptance_criteria`, `expected_output`, `assignee`, `parallel_group`. Request execution plan (phases and order).
 - **Output to keep:** `tasks` (array), execution plan (which task runs when, and which are parallel).
+- **You (Orchestrator) do not create the plan** — only call the Planner and use its output.
 
 ### Step 3: Execute Tasks in Order
 
@@ -128,21 +130,22 @@ Map task `assignee` from Orchestrator output to `subagent_type` for `mcp_task`. 
 
 ## Context Handoffs (What to Pass Where)
 
-| From → To           | Pass                                                                 |
-|---------------------|----------------------------------------------------------------------|
-| User → Architect    | Feature description only (and codebase context as needed).           |
-| Architect → Orchestrator | Feature + architecture JSON (or summary) + constraints_for_orchestrator + contracts. |
+| From → To        | Pass                                                                 |
+|------------------|----------------------------------------------------------------------|
+| User → Architect | Feature description only (and codebase context as needed).           |
+| Architect → Planner | Feature + architecture JSON (or summary) + constraints_for_orchestrator + contracts. |
+| Planner → Orchestrator | tasks array + execution plan (Orchestrator uses this to run Workers/Reviewers). |
 | Orchestrator → Worker | One task (title, description, scope, acceptance_criteria, expected_output) + architecture/contracts relevant to that task. |
-| Worker → Reviewer  | Same task + architecture/contracts + description of changes (or diff). |
-| Reviewer → Worker (rework) | Same task + "Review Result: FAILED" and the list of issues.   |
-| Any phase → User    | Final report; on conflict or circuit breaker, reason and next steps. |
+| Worker → Reviewer | Same task + architecture/contracts + description of changes (or diff). |
+| Reviewer → Worker (rework) | Same task + "Review Result: FAILED" and the list of issues. |
+| Any phase → User | Final report; on conflict or circuit breaker, reason and next steps. |
 
 ---
 
 ## Failure and Conflict Handling
 
 - **Architect returns architecture_conflict:** Stop; report `conflict_reason` and `suggested_refactor` to user.
-- **Orchestrator returns clarification questions:** Return those questions to the user; resume after answer.
+- **Planner returns clarification questions:** Return those questions to the user; resume after answer.
 - **Review FAILED &lt;= 3 times:** Send issues to Worker, retry same task.
 - **Review FAILED 4th time (circuit breaker):** Freeze task, write short failure analysis, suggest decomposition or architecture reassessment, report to user.
 - **Worker or Reviewer subagent unavailable:** Report to user that the assignee type is not available and list available subagent types so they can adjust agents or task assignees.

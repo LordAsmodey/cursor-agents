@@ -8,31 +8,33 @@ The system is **orchestration-centric**: one executing agent (the one that reads
 
 ## High-Level Flow
 
+The **Orchestrator** (executing agent) only manages: it decides whom to call and what to pass; it does not write code or create the plan. The **Planner** produces the task list and execution plan.
+
 ```
 User: "implement: <feature>"
          │
          ▼
 ┌─────────────────────┐
-│ 1. ARCHITECT        │  (optional)
+│ 1. ARCHITECT        │  (optional; Orchestrator decides)
 │    Design           │  → architecture JSON, constraints_for_orchestrator, contracts
 └──────────┬──────────┘
            │
            ▼
 ┌─────────────────────┐
-│ 2. ORCHESTRATOR     │
-│    Decompose        │  → tasks[], execution plan
+│ 2. PLANNER         │
+│    Create plan      │  → tasks[], execution plan (assignee, scope, order)
 └──────────┬──────────┘
            │
            ▼
 ┌──────────────────────────────────────────────────────────────┐
-│ 3. FOR EACH TASK (by execution plan)                          │
+│ 3. ORCHESTRATOR executes plan: FOR EACH TASK (by plan order)  │
 │    ┌────────────┐         ┌────────────────┐                  │
 │    │ WORKER     │ ──────► │ REVIEWER       │                  │
 │    │ (assignee) │         │ (matching)     │                  │
 │    └─────┬──────┘         └───────┬────────┘                  │
 │          │ FAILED ≤3              │ APPROVED                   │
 │          └────────────────────────┘ → next task                │
-│          │ FAILED >3 → circuit breaker → escalate               │
+│          │ FAILED >3 → circuit breaker → escalate             │
 └──────────────────────────────────────────────────────────────┘
            │
            ▼
@@ -43,11 +45,12 @@ User: "implement: <feature>"
 
 ## Components
 
-### Coordinator (executing agent)
+### Orchestrator (executing agent / coordinator)
 
-- Reads `.cursor/skills/implement-feature/SKILL.md`.
-- Parses user input, optionally calls Architect, then Orchestrator.
-- For each task: calls Worker by assignee, then matching Reviewer; handles rework loop and circuit breaker.
+- Reads `.cursor/skills/implement-feature/SKILL.md` and acts as Orchestrator (management only).
+- Parses user input; decides whether to call Architect; calls Planner with feature + optional architecture.
+- Receives plan from Planner; does **not** create the plan or write code.
+- For each task in plan order: calls Worker by assignee, then matching Reviewer; handles rework loop and circuit breaker.
 - Produces final report.
 
 ### Architect
@@ -56,11 +59,11 @@ User: "implement: <feature>"
 - **Output:** Architecture design (JSON), contracts, `constraints_for_orchestrator`, steering rules, risks, optional ADR candidate.
 - **Circuit breaker:** Can set `architecture_conflict: true` and stop the workflow.
 
-### Orchestrator
+### Planner
 
-- **Input:** Feature description; optionally architecture (or summary) and constraints.
+- **Input:** Feature description; optionally architecture (or summary) and constraints from Architect.
 - **Output:** List of tasks (id, title, scope, depends_on, acceptance_criteria, assignee, parallel_group) and execution plan.
-- Does not implement or review; only plans.
+- Does not implement, review, or manage execution; only creates the plan. Consumes `constraints_for_orchestrator` when architecture is provided.
 
 ### Workers
 
@@ -79,7 +82,8 @@ User: "implement: <feature>"
 | From → To | What is passed |
 |-----------|----------------|
 | User → Architect | Feature description |
-| Architect → Orchestrator | Feature + architecture (or summary) + constraints_for_orchestrator + contracts |
+| Architect → Planner | Feature + architecture (or summary) + constraints_for_orchestrator + contracts |
+| Planner → Orchestrator | tasks array + execution plan (Orchestrator uses this to run Workers/Reviewers) |
 | Orchestrator → Worker | One task + architecture/contracts relevant to that task |
 | Worker → Reviewer | Same task + architecture/contracts + description of changes |
 | Reviewer → Worker (rework) | Same task + "FAILED" + list of issues |
@@ -89,9 +93,9 @@ User: "implement: <feature>"
 
 The implement-feature skill keeps an **Agent Registry** table that maps:
 
-- Task `assignee` (string from Orchestrator) → `subagent_type` (string for `mcp_task`).
+- Task `assignee` (string from **Planner** output) → `subagent_type` (string for `mcp_task`).
 
-When you add new agents (e.g. backend-worker), add a row to that table and use the same assignee in Architect/Orchestrator outputs so the coordinator can dispatch correctly.
+When you add new agents (e.g. backend-worker), add a row to that table and use the same assignee in Architect and Planner outputs so the Orchestrator can dispatch correctly.
 
 ## Failure Handling
 
