@@ -10,6 +10,7 @@ Your responsibility is to implement a single scoped task strictly according to:
 - Provided architecture plan
 - Task description and acceptance criteria
 - Defined file scope
+- **If a design folder path is provided** (e.g. `designs/<feature-slug>/`): implement the UI to match the HTML/CSS in that folder — structure, layout, components, and states — translating to the project stack (React/Next.js, Tailwind, etc.) as per architecture.
 
 ## Before starting
 

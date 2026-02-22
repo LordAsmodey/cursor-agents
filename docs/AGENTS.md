@@ -4,12 +4,23 @@ This document describes each agent in the system. It is intended for both humans
 
 ## Agent List (Current)
 
+### Design segment (design-feature skill)
+
+| Agent | Role | Trigger / When used |
+|-------|------|----------------------|
+| **designer** | Produces HTML+CSS prototype in given folder; semantic HTML, responsive, a11y; input: feature description, optional ref/competitor | Invoked by Design Orchestrator when running design-feature |
+| **design-reviewer** | Reviews design folder for requirements, responsiveness, accessibility, structure; APPROVED or FAILED + issues | After Designer; invoked by Design Orchestrator |
+
+The **Design Orchestrator** is the executing agent when the user says "design" / "design: &lt;feature&gt;"; it does not create HTML/CSS itself, only coordinates designer and design-reviewer.
+
+### Implement segment (implement-feature skill)
+
 | Agent | Role | Trigger / When used |
 |-------|------|----------------------|
 | **architect** | Researches best practices, proposes 3+ options, chooses best; full-stack design aligned with existing architecture | Design phase; use strongest model (e.g. Opus); optional for trivial features |
 | **orchestrator** | Management only: decides whom to call (Architect, Planner, Workers, Reviewers), passes context; does not write code or create the plan | Executing agent when running implement-feature |
-| **planner** | Create task list and execution plan from feature + optional architecture | After (optional) Architect; invoked by Orchestrator |
-| **frontend-worker** | Implement a single frontend task (React/Next.js/TypeScript) | Per task with assignee `frontend-worker` |
+| **planner** | Create task list and execution plan from feature + optional architecture (and optional design folder path) | After (optional) Architect; invoked by Orchestrator |
+| **frontend-worker** | Implement a single frontend task (React/Next.js/TypeScript); when design folder provided, implement UI to match that HTML/CSS | Per task with assignee `frontend-worker` |
 | **frontend-reviewer** | Review frontend changes for scope, types, SSR, performance, a11y | After each frontend-worker task |
 | **backend-worker** | Implement a single backend task (API, services, DTOs, validation, DB) | Per task with assignee `backend-worker` |
 | **backend-reviewer** | Review backend changes for contracts, validation, security, scope | After each backend-worker task |
@@ -18,7 +29,21 @@ This document describes each agent in the system. It is intended for both humans
 | **e2e-tester** | Design E2E cases, write or extend E2E tests, build and run; report PASSED or FAILED | Test phase, after backend-tester |
 | **docs-writer** | Create/update ADR, README, docs/ after implementation | Docs phase, after test phase; invoked by Orchestrator |
 
-## Architect
+## Designer (design segment)
+
+- **Does:** Creates a static HTML+CSS design prototype in the **given folder path** (e.g. `designs/<feature-slug>/`). Uses feature description and optional reference URL, competitor site, or style notes. Follows semantic HTML, responsive layout, accessibility, BEM-like or kebab-case class names, modular CSS. Can add README in folder describing screens and states. When Design Reviewer returns FAILED, updates the same folder to address issues.
+- **Does not:** Write JS framework code (React, etc.); run the design flow; review designs.
+- **Output:** Files in the given folder (HTML, CSS, optional README). Summary for Orchestrator: files created, screens/components, assumptions.
+- **Ref:** `.cursor/agents/designer.md`
+
+## Design Reviewer (design segment)
+
+- **Does:** Reviews the HTML+CSS in the **given design folder** for: (1) requirements compliance, (2) responsiveness, (3) accessibility (semantic HTML, labels, headings, ARIA, focus), (4) structure and maintainability (naming, organization). Does not modify files.
+- **Does not:** Create or edit design; run the design flow.
+- **Output:** `APPROVED` (with short summary) or `FAILED` with a list of issues (what’s wrong, why it matters, how to fix) per `.cursor/agents/design-reviewer.md`.
+- **Ref:** `.cursor/agents/design-reviewer.md`
+
+## Architect (implement segment)
 
 - **Does:** Researches (web search, best practices, docs); produces at least 3 architectural options and chooses the best for the task and project; analyzes requirements; evaluates and **respects existing codebase architecture**; defines frontend and backend approach, boundaries, DTOs, API contracts, file structure, state management, steering rules, constraints for Planner, risks, optional ADR. Run with the **most capable model** (e.g. Claude Opus); Orchestrator should invoke with strongest model, not default/fast.
 - **Does not:** Implement code, split into tasks, review code, manage execution.
@@ -39,7 +64,7 @@ This document describes each agent in the system. It is intended for both humans
 
 ## Frontend Worker
 
-- **Does:** Implements one scoped frontend task per architecture plan and acceptance criteria. Uses existing patterns, styling, and state management.
+- **Does:** Implements one scoped frontend task per architecture plan and acceptance criteria. When a **design folder path** is provided (e.g. `designs/<feature-slug>/`), implements the UI to match the HTML/CSS in that folder (structure, layout, components, states) in the project stack (React/Next.js, Tailwind, etc.). Uses existing patterns, styling, and state management.
 - **Does not:** Change architecture, modify out-of-scope files, refactor unrelated code, add new global deps or styling.
 - **Context:** Reads `.cursor/rules/`; follows existing project structure and conventions.
 
@@ -87,7 +112,11 @@ This document describes each agent in the system. It is intended for both humans
 
 ## Adding New Agents
 
-1. Add a new agent definition file under `.cursor/agents/` (e.g. `test-runner.md`, `docs-writer.md`).
-2. In the implement-feature skill’s **Agent Registry**, add a row mapping the new assignee to the new `subagent_type`.
-3. In Architect and Planner instructions/outputs, use the new assignee for the corresponding tasks.
-4. Ensure your Cursor/environment supports the new `subagent_type` in `mcp_task` (or equivalent) so the coordinator can invoke the new agent.
+**Implement segment:**  
+1. Add a new agent definition file under `.cursor/agents/`.  
+2. In the implement-feature skill’s **Agent Registry**, add a row mapping the new assignee to the new `subagent_type`.  
+3. In Architect and Planner instructions/outputs, use the new assignee for the corresponding tasks.  
+4. Ensure your Cursor/environment supports the new `subagent_type` in `mcp_task` so the Orchestrator can invoke it.
+
+**Design segment:**  
+Design flow uses only `designer` and `design-reviewer`; they are invoked explicitly by the Design Orchestrator (no Planner assignees). To add new design-phase agents, extend `.cursor/skills/design-feature/SKILL.md` and the rule in `.cursor/rules/design-command.mdc`, and add the corresponding agent file under `.cursor/agents/`.

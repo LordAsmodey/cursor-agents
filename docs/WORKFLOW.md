@@ -14,6 +14,7 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 ### Step 0 — Parse user input
 
 - Extract the feature description from the user message.
+- If the user indicates that **design is already ready** (e.g. "design is in `designs/onboarding-wizard/`"), capture the **design folder path** and pass it to the Planner and to frontend tasks so implementation matches the HTML/CSS in that folder.
 - If too vague, ask one clarifying question before starting.
 
 ### Step 1 — Architect (optional)
@@ -24,7 +25,7 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 
 ### Step 2 — Planner
 
-- **Pass:** Feature description; optionally full architecture (or summary) and note to use constraints_for_orchestrator and contracts.
+- **Pass:** Feature description; optionally full architecture (or summary) and note to use constraints_for_orchestrator and contracts; **if design folder path was provided**, include it so the Planner can scope frontend tasks to implement from that design.
 - **Request:** Task list and execution plan per `.cursor/agents/planner.md`: tasks with id, title, description, scope, depends_on, acceptance_criteria, expected_output, assignee, parallel_group.
 - **Keep:** tasks array and execution plan (order and parallel groups). The Orchestrator (you) does not create the plan — only call Planner and use its output.
 - **Validate plan:** Before executing, ensure each task has non-empty scope, assignee is in Agent Registry, and depends_on has no circular references. If not, ask Planner to fix or report to user.

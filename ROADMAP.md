@@ -14,10 +14,29 @@ This document is a living roadmap and todo list: which agents and capabilities a
 | Frontend Reviewer | Done | `.cursor/agents/frontend-reviewer.md` |
 | Backend Worker | Done | `.cursor/agents/backend-worker.md` |
 | Backend Reviewer | Done | `.cursor/agents/backend-reviewer.md` |
-| Implement-feature skill | Done | Full workflow: design → decompose → implement → review |
+| Implement-feature skill | Done | Full workflow: architect → plan → implement → review → test → docs |
 | Implement rule | Done | Triggers skill on "implement" / "implement: &lt;feature&gt;" |
-| Agent Registry | Done | Maps assignee → subagent_type (frontend + backend) |
-| Documentation | Done | README, docs/ARCHITECTURE, AGENTS, WORKFLOW |
+| Agent Registry | Done | Maps assignee → subagent_type (frontend + backend + testers, docs-writer) |
+| Design segment | Done | design-feature skill, designer, design-reviewer, design-command rule |
+| Designer agent | Done | `.cursor/agents/designer.md` — HTML+CSS in `designs/<feature-slug>/` |
+| Design Reviewer agent | Done | `.cursor/agents/design-reviewer.md` |
+| Design rule | Done | Triggers design-feature on "design" / "design: &lt;feature&gt;" |
+| Design → implement handoff | Done | User passes design folder; Planner/frontend-worker use it |
+| Documentation | Done | README, docs/ARCHITECTURE, AGENTS, WORKFLOW, DESIGN-WORKFLOW |
+
+---
+
+## 0. Design Segment (Done)
+
+Standalone design flow: UI/UX prototypes as HTML+CSS in a feature folder, then pass that folder to implement.
+
+| Item | Description | Deliverable |
+|------|-------------|-------------|
+| **design-feature skill** | Design Orchestrator calls Designer → Design Reviewer; output folder `designs/<feature-slug>/`. | Done: `.cursor/skills/design-feature/SKILL.md` |
+| **designer** | Produces HTML+CSS in given folder from feature description / ref / competitor; semantic HTML, responsive, a11y. | Done: `.cursor/agents/designer.md` |
+| **design-reviewer** | Reviews folder for requirements, responsiveness, accessibility; APPROVED or FAILED + issues. | Done: `.cursor/agents/design-reviewer.md` |
+| **design-command rule** | Triggers design-feature on "design" / "design: &lt;feature&gt;". | Done: `.cursor/rules/design-command.mdc` |
+| **Handoff to implement** | User passes design folder path; Planner and frontend-worker implement from that design. | Done: implement-feature Step 0, Context Handoffs, planner.md, frontend-worker.md; `designs/README.md` |
 
 ---
 
@@ -91,12 +110,14 @@ End-to-end quality gates are not yet automated in the workflow.
 - [x] Register backend agents in implement-feature skill Agent Registry
 - [x] Update Architect/Orchestrator to use `backend-worker` / `backend-reviewer` for backend tasks
 - [x] Update docs/AGENTS.md with backend agents
+- [x] Add design segment: design-feature skill, designer, design-reviewer, design-command rule
+- [x] Document design output and handoff to implement (designs/README.md, docs/DESIGN-WORKFLOW.md)
 - [ ] Define lint/format step in workflow (rule or skill)
 - [ ] Add `docs/adr/` and ADR template (optional)
 - [ ] Design and add test-runner or test step (optional)
-- [ ] Add documentation writer agent (optional)
+- [x] Add documentation writer agent (optional) — done
 - [ ] Add CI/pipeline hints to architecture or report (optional)
 
 ---
 
-*Last updated: 2025-02 — adjust dates and check off items as the project evolves.*
+*Last updated: 2026-02 — design segment added; adjust dates and check off items as the project evolves.*
