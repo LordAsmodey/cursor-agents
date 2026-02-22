@@ -6,7 +6,7 @@ This document describes each agent in the system. It is intended for both humans
 
 | Agent | Role | Trigger / When used |
 |-------|------|----------------------|
-| **architect** | Full-stack design: structure, contracts, DTOs, constraints for Planner | Design phase; optional for trivial features |
+| **architect** | Researches best practices, proposes 3+ options, chooses best; full-stack design aligned with existing architecture | Design phase; use strongest model (e.g. Opus); optional for trivial features |
 | **orchestrator** | Management only: decides whom to call (Architect, Planner, Workers, Reviewers), passes context; does not write code or create the plan | Executing agent when running implement-feature |
 | **planner** | Create task list and execution plan from feature + optional architecture | After (optional) Architect; invoked by Orchestrator |
 | **frontend-worker** | Implement a single frontend task (React/Next.js/TypeScript) | Per task with assignee `frontend-worker` |
@@ -20,7 +20,7 @@ This document describes each agent in the system. It is intended for both humans
 
 ## Architect
 
-- **Does:** Analyzes requirements, evaluates codebase patterns, defines frontend and backend approach, specifies boundaries, DTOs, API contracts, file structure, state management, steering rules, constraints for Planner, risks, optional ADR.
+- **Does:** Researches (web search, best practices, docs); produces at least 3 architectural options and chooses the best for the task and project; analyzes requirements; evaluates and **respects existing codebase architecture**; defines frontend and backend approach, boundaries, DTOs, API contracts, file structure, state management, steering rules, constraints for Planner, risks, optional ADR. Run with the **most capable model** (e.g. Claude Opus); Orchestrator should invoke with strongest model, not default/fast.
 - **Does not:** Implement code, split into tasks, review code, manage execution.
 - **Output:** Structured JSON (see `.cursor/agents/architect.md`) including `architecture_conflict` when circuit breaker applies.
 
