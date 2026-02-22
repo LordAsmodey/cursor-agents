@@ -41,9 +41,10 @@ Do **not** use the full workflow for one-off edits, small bugfixes without featu
 
 ### Step 3.5 — Test phase (after all implementation tasks)
 
+- Orchestrator passes each tester **feature summary** and **tasks relevant to that tester** (with acceptance_criteria, scope). Testers **design test cases** from the tasks, **write or extend tests**, then **run the suite**.
 - Run testers in order: **frontend-tester** → **backend-tester** → **e2e-tester** (build + E2E/integration).
-- Orchestrator maintains **test_retry_count** (initial 0). Maximum **3 test retry cycles**.
-- If any tester reports **FAILED**: increment test_retry_count; if test_retry_count &lt; 3, identify affected tasks by domain (frontend failure → frontend-worker tasks; backend → backend-worker; E2E → all or as suggested), rework them (Worker → Reviewer), then re-run the test phase. If test_retry_count ≥ 3 → **test circuit breaker**: stop test rework, summarize which tester failed, suggest next steps, include in final report.
+- Orchestrator maintains **test_retry_count** (initial 0). Maximum **3 test retry cycles** (no infinite loops).
+- If any tester reports **FAILED**: increment test_retry_count; if test_retry_count &lt; 3, identify affected tasks by domain (frontend → frontend-worker tasks; backend → backend-worker; E2E → all or as suggested), send feedback to **Worker** → **Reviewer** reviews again → when APPROVED, re-run the test phase (testers again). If test_retry_count ≥ 3 → **test circuit breaker**: stop test rework, summarize which tester failed, suggest next steps, include in final report.
 
 ### Step 4 — Report to user
 
