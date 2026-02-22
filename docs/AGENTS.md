@@ -9,9 +9,10 @@ This document describes each agent in the system. It is intended for both humans
 | Agent | Role | Trigger / When used |
 |-------|------|----------------------|
 | **designer** | Produces HTML+CSS prototype in given folder; semantic HTML, responsive, a11y; input: feature description, optional ref/competitor | Invoked by Design Orchestrator when running design-feature |
-| **design-reviewer** | Reviews design folder for requirements, responsiveness, accessibility, structure; APPROVED or FAILED + issues | After Designer; invoked by Design Orchestrator |
+| **viewport-runner** | Runs viewport screenshot script (Node + Playwright) for design folder; saves PNGs to folder/screenshots/ or reports SKIPPED | After Designer, before Design Reviewer; invoked by Design Orchestrator |
+| **design-reviewer** | First reviews code (HTML/CSS), then screenshots (if present) for requirements, responsiveness, accessibility; APPROVED or FAILED + issues | After viewport-runner; invoked by Design Orchestrator |
 
-The **Design Orchestrator** is the executing agent when the user says "design" / "design: &lt;feature&gt;"; it does not create HTML/CSS itself, only coordinates designer and design-reviewer.
+The **Design Orchestrator** is the executing agent when the user says "design" / "design: &lt;feature&gt;"; it does not create HTML/CSS itself, only coordinates designer, viewport-runner, and design-reviewer.
 
 ### Implement segment (implement-feature skill)
 
@@ -36,10 +37,18 @@ The **Design Orchestrator** is the executing agent when the user says "design" /
 - **Output:** Files in the given folder (HTML, CSS, optional README). Summary for Orchestrator: files created, screens/components, assumptions.
 - **Ref:** `.cursor/agents/designer.md`
 
+## Viewport Runner (design segment)
+
+- **Does:** Runs the project script `node scripts/viewport-screenshots.js <design-folder-path>` from project root. The script starts a static server from the design folder, opens the page in Playwright at 320×720, 768×1024, 1024×768, 1440×900, saves screenshots to `<design-folder>/screenshots/`. Reports DONE (path + list of files) or SKIPPED (e.g. script not found, Playwright not installed).
+- **Does not:** Review design; create or edit HTML/CSS; run the design flow.
+- **Output:** Summary for Orchestrator: Viewport capture DONE or SKIPPED with reason. If SKIPPED, Design Reviewer proceeds with code-only review.
+- **Requires:** Project has `package.json`, `scripts/viewport-screenshots.js`, and `playwright` installed (`npm install`). Optional: Playwright MCP (see `.cursor/mcp.json`) for alternative capture.
+- **Ref:** `.cursor/agents/viewport-runner.md`
+
 ## Design Reviewer (design segment)
 
-- **Does:** Reviews the HTML+CSS in the **given design folder** for: (1) requirements compliance, (2) responsiveness, (3) accessibility (semantic HTML, labels, headings, ARIA, focus), (4) structure and maintainability (naming, organization). Does not modify files.
-- **Does not:** Create or edit design; run the design flow.
+- **Does:** **Phase 1** — Reviews the HTML/CSS in the **given design folder** for: requirements compliance, responsiveness (from code), accessibility, structure and maintainability. **Phase 2** — If folder contains `screenshots/`, reviews each screenshot for viewport responsiveness (overflow, readability, layout). Does not modify files.
+- **Does not:** Create or edit design; run the viewport capture or design flow.
 - **Output:** `APPROVED` (with short summary) or `FAILED` with a list of issues (what’s wrong, why it matters, how to fix) per `.cursor/agents/design-reviewer.md`.
 - **Ref:** `.cursor/agents/design-reviewer.md`
 

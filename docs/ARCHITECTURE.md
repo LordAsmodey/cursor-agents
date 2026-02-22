@@ -6,7 +6,7 @@ This document describes the high-level architecture of the Cursor subagent syste
 
 The system is **orchestration-centric**: one executing agent drives each flow and calls specialized subagents via `mcp_task` with a `subagent_type` and a detailed prompt. There is no shared queue or external scheduler — coordination is linear and phase-based.
 
-- **Design segment:** Executing agent runs **design-feature** skill as **Design Orchestrator**; calls **designer** then **design-reviewer**. Output: folder `designs/<feature-slug>/` with HTML+CSS. Not tied to implement.
+- **Design segment:** Executing agent runs **design-feature** skill as **Design Orchestrator**; calls **designer** → **viewport-runner** (screenshots at several resolutions) → **design-reviewer**. Output: folder `designs/<feature-slug>/` with HTML+CSS and optionally `screenshots/`. Not tied to implement.
 - **Implement segment:** Executing agent runs **implement-feature** skill as **Orchestrator**; calls Architect (optional), Planner, Workers, Reviewers, testers, docs-writer. Can consume a design folder path when user provides it.
 
 ## Design Flow (standalone)
@@ -22,14 +22,14 @@ User: "design: <feature>" (optional: ref URL, competitor, style notes)
 └──────────┬──────────┘
            │
            ▼
-┌─────────────────────┐     ┌─────────────────────┐
-│ DESIGNER             │ ──► │ DESIGN REVIEWER      │
-│ HTML+CSS in folder  │     │ requirements,        │
-│ (semantic, a11y,     │     │ responsive, a11y    │
-│  responsive)         │     │ → APPROVED / FAILED  │
-└─────────────────────┘     └──────────┬────────────┘
-           │ FAILED (≤3)                │ APPROVED
-           └────────────────────────────┘ → report path to user
+┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│ DESIGNER             │ ──► │ VIEWPORT-RUNNER      │ ──► │ DESIGN REVIEWER      │
+│ HTML+CSS in folder  │     │ server + screenshots │     │ 1. code 2. screens   │
+│ (semantic, a11y)     │     │ → screenshots/ or    │     │ → APPROVED / FAILED  │
+└─────────────────────┘     │   SKIPPED            │     └──────────┬────────────┘
+                            └─────────────────────┘                │
+           │ FAILED (≤3)                │ APPROVED                 │
+           └────────────────────────────┴───────────────────────────┘ → report path
 ```
 
 Design flow does not call Architect or Planner. Handoff to implement: user later says **"implement: &lt;feature&gt; — design is ready in `designs/<feature-slug>/`"**; Orchestrator passes that path to Planner and frontend tasks.
@@ -114,8 +114,10 @@ User: "implement: <feature>"
 | User → Design Orchestrator | Feature description; optional ref URL, competitor, style notes |
 | Design Orchestrator → Designer | Feature name, description, output folder path, refs/constraints |
 | Designer → Design Orchestrator | Summary of files created, structure |
-| Design Orchestrator → Design Reviewer | Folder path, feature description/requirements |
-| Design Reviewer → Design Orchestrator | APPROVED or FAILED + issues |
+| Design Orchestrator → viewport-runner | Design folder path; request to run viewport script |
+| viewport-runner → Design Orchestrator | DONE (path to screenshots, list of files) or SKIPPED (reason) |
+| Design Orchestrator → Design Reviewer | Folder path, feature description/requirements; note if screenshots present |
+| Design Reviewer → Design Orchestrator | APPROVED or FAILED + issues (code and/or screenshots) |
 | Design Orchestrator → Designer (rework) | Same folder + "FAILED" + issues list |
 | Design Orchestrator → User | Path to folder; how to use with implement |
 

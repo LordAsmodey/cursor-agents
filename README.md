@@ -9,7 +9,7 @@ This repository defines **subagents** and **coordinated workflows**:
 ### Design workflow (separate segment)
 
 - Say **"design"** or **"design: &lt;feature&gt;"** (optionally with reference URL, competitor site, or style notes — Figma not required).
-- The **Design Orchestrator** (executing agent) calls **Designer** → **Design Reviewer**; output is a folder **`designs/<feature-slug>/`** with HTML+CSS. You can then pass that folder to the implement flow.
+- The **Design Orchestrator** (executing agent) calls **Designer** → **viewport-runner** (screenshots at several resolutions) → **Design Reviewer** (code, then screenshots); output is a folder **`designs/<feature-slug>/`** with HTML+CSS and optionally `screenshots/`. You can then pass that folder to the implement flow. For viewport capture, run `npm install` (and once `npx playwright install chromium`); see [Design workflow](docs/DESIGN-WORKFLOW.md) → "Setup for viewport capture". Optional: [Playwright MCP](https://github.com/microsoft/playwright-mcp) (config in `.cursor/mcp.json`).
 
 ### Implement workflow
 
@@ -29,7 +29,8 @@ Agents are invoked via Cursor’s `mcp_task` (or equivalent) by an executing age
 |--------|-------------|
 | **Design Orchestrator** | Runs design flow: calls Designer, then Design Reviewer; does not create HTML/CSS. Output: `designs/<feature-slug>/`. |
 | **Designer** | UI/UX agent: produces HTML+CSS prototype in the given folder (semantic HTML, responsive, a11y). Input: feature description, optional ref/competitor. |
-| **Design Reviewer** | Reviews the design folder for requirements, responsiveness, accessibility; returns APPROVED or FAILED with issues. |
+| **Viewport-runner** | Runs the viewport screenshot script for a design folder (Node + Playwright); saves PNGs to `designs/<feature>/screenshots/`. Optional; if skipped, reviewer does code-only. |
+| **Design Reviewer** | Reviews code (HTML/CSS) first, then screenshots (if present) for requirements, responsiveness, accessibility; returns APPROVED or FAILED with issues. |
 | **Architect** | Full-stack technical design: frontend/backend structure, contracts, DTOs, constraints for the Planner. Optional for trivial features. |
 | **Orchestrator** | Management only: decides whom to call (Architect, Planner, Workers, Reviewers) and what to pass; does not write code or create the plan. |
 | **Planner** | Creates the implementation plan: atomic tasks, dependencies, execution order, assignees. Consumes architecture and optional design folder path. |
@@ -49,7 +50,8 @@ Agents are invoked via Cursor’s `mcp_task` (or equivalent) by an executing age
     orchestrator.md
     planner.md
     designer.md           # UI/UX design (HTML+CSS)
-    design-reviewer.md   # Review design folder
+    viewport-runner.md    # Viewport screenshots (script: scripts/viewport-screenshots.js)
+    design-reviewer.md    # Review design folder (code + screenshots)
     frontend-worker.md
     frontend-reviewer.md
     backend-worker.md
@@ -72,7 +74,7 @@ ROADMAP.md          # Roadmap and todo
 
 - Say **"implement"** or **"implement: &lt;feature description&gt;"** in Cursor. If design is already done: **"implement: &lt;feature&gt; — design is ready in `designs/onboarding-wizard/`"**.
 - The rule applies the **implement-feature** skill; the executing agent acts as **Orchestrator**: (as needed) Architect → **Planner** (with optional design folder path) → for each task Worker then Reviewer → test phase → docs phase → report.
-- Ensure your environment has the corresponding `subagent_type` values (including `designer`, `design-reviewer` for design; `architect`, `planner`, workers, reviewers, testers, docs-writer for implement) so `mcp_task` can dispatch to them.
+- Ensure your environment has the corresponding `subagent_type` values (including `designer`, `viewport-runner`, `design-reviewer` for design; `architect`, `planner`, workers, reviewers, testers, docs-writer for implement) so `mcp_task` can dispatch to them.
 
 ## Documentation
 

@@ -12,7 +12,8 @@ When the user says **design** or **design: &lt;feature description&gt;** (or an 
    - Parse input: feature name, description, optional reference URL / competitor site / style notes.
    - Define output folder: `designs/<feature-slug>/`.
    - Call **designer** (mcp_task, subagent_type: designer) to create HTML+CSS in that folder.
-   - Call **design-reviewer** (mcp_task, subagent_type: design-reviewer) to check requirements, responsiveness, accessibility.
+   - Call **viewport-runner** (mcp_task, subagent_type: viewport-runner) to capture screenshots at several viewports (script: `node scripts/viewport-screenshots.js <design-folder>`); if skipped, reviewer does code-only.
+   - Call **design-reviewer** (mcp_task, subagent_type: design-reviewer): first code review, then screenshot review (if screenshots present).
    - On FAILED review: pass issues back to designer and repeat (max 3 rework cycles); then circuit breaker if still FAILED.
    - Report to the user: path to the folder and how to use it with implement ("implement: <feature> — design is ready in `designs/<feature-slug>/`").
 

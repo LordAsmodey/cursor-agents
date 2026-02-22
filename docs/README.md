@@ -9,7 +9,7 @@ Documentation for the Cursor subagent system: **design** (UI/UX HTML+CSS prototy
 | [ARCHITECTURE.md](ARCHITECTURE.md) | High-level architecture: design and implement segments, flows, handoffs, failure handling |
 | [AGENTS.md](AGENTS.md) | Reference for each agent (design + implement): role, behavior, how to add new agents |
 | [WORKFLOW.md](WORKFLOW.md) | Implement-feature workflow: steps, Agent Registry, checklists |
-| [DESIGN-WORKFLOW.md](DESIGN-WORKFLOW.md) | Design-feature workflow: steps, output folder, handoff to implement |
+| [DESIGN-WORKFLOW.md](DESIGN-WORKFLOW.md) | Design-feature workflow: steps, viewport-runner, setup for viewport capture, output folder, handoff to implement |
 
 ## Related
 
@@ -19,4 +19,5 @@ Documentation for the Cursor subagent system: **design** (UI/UX HTML+CSS prototy
 - **Implement rule:** `.cursor/rules/implement-command.mdc`
 - **Agent definitions:** `.cursor/agents/*.md`
 - **Design output folder:** `designs/` — see [designs/README.md](../designs/README.md)
+- **Viewport capture:** Script `scripts/viewport-screenshots.js`; setup in DESIGN-WORKFLOW.md (§ Setup for viewport capture). Optional MCP: `.cursor/mcp.json` (Playwright).
 - **Roadmap / todo:** [ROADMAP.md](../ROADMAP.md) (repository root)

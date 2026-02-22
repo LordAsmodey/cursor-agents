@@ -37,9 +37,16 @@ User: "design: <feature>" (or "design" + description / ref / competitor URL)
          │
          ▼
 ┌─────────────────┐
+│ VIEWPORT-RUNNER │  subagent_type: viewport-runner
+│ Server +        │  → runs script: screenshots to designs/<feature-slug>/screenshots/
+│ screenshots     │  (optional; if skipped, reviewer does code-only)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
 │ DESIGN REVIEWER │  subagent_type: design-reviewer
-│ Check: reqs,    │  → APPROVED or FAILED + issues
-│ responsive, a11y│
+│ 1. Code review  │  → then 2. Screenshot review (if screenshots present)
+│ 2. Screenshots  │  → APPROVED or FAILED + issues
 └────────┬────────┘
          │  FAILED (rework_count < 3) → pass issues to Designer, repeat
          │  FAILED (rework_count ≥ 3) → circuit breaker → report
@@ -59,7 +66,8 @@ User: "design: <feature>" (or "design" + description / ref / competitor URL)
   - `index.html` — main entry or list of screens
   - Optional: one HTML per screen (e.g. `login.html`, `dashboard.html`) and shared `styles.css` or per-screen CSS.
   - Optional: `README.md` in the folder describing screens and states (for implement flow).
-- The Designer agent is responsible for creating this structure; the Orchestrator only defines the folder path and passes it to Designer and Design Reviewer.
+- **Screenshots (optional):** After the Designer, the **viewport-runner** agent may run and add `screenshots/` inside the feature folder (e.g. `320x720-mobile.png`, `768x1024-tablet.png`, …). The Design Reviewer uses these for viewport-based responsiveness check when present.
+- The Designer agent is responsible for creating the HTML/CSS structure; the Orchestrator defines the folder path and calls Designer, then viewport-runner, then Design Reviewer.
 
 ---
 
@@ -82,13 +90,21 @@ User: "design: <feature>" (or "design" + description / ref / competitor URL)
   - Instruction: "Create HTML+CSS prototype in the given folder. Follow best practices: semantic HTML, responsive layout, accessibility. Use BEM-like or kebab-case class names; keep CSS modular. Produce only HTML and CSS (no JS framework). See .cursor/agents/designer.md for full instructions."
 - Capture the Designer’s summary (files created, structure, key decisions).
 
+### Step 1.5: Call Viewport Runner (optional but recommended)
+
+- **subagent_type:** `viewport-runner`
+- **Prompt** must include:
+  - Path to the design folder (e.g. `designs/<feature-slug>/`)
+  - Instruction: "Run the viewport screenshot capture for this design folder. Use the project script: from project root run `node scripts/viewport-screenshots.js <design-folder-path>`. Report DONE with path to screenshots and list of files, or SKIPPED with reason so the Design Reviewer can proceed with code-only review."
+- If viewport-runner reports **SKIPPED** (e.g. script not found, npm not run), continue to Step 2 — the Design Reviewer will review code only. If **DONE**, the design folder will contain `screenshots/` and the Reviewer will also review screenshots.
+
 ### Step 2: Call Design Reviewer
 
 - **subagent_type:** `design-reviewer`
 - **Prompt** must include:
   - Path to the design folder (e.g. `designs/<feature-slug>/`)
   - Original feature description and requirements (so reviewer can check compliance)
-  - Request: "Review the design in this folder for: (1) compliance with requirements, (2) responsiveness, (3) accessibility, (4) structure and maintainability. Output APPROVED or FAILED with issues per .cursor/agents/design-reviewer.md."
+  - Request: "First review the HTML/CSS in this folder (requirements, responsiveness from code, accessibility, structure). If that passes, then review the screenshots in the folder’s `screenshots/` subfolder (if present) for viewport responsiveness — overflow, readability, layout at each resolution. Output APPROVED or FAILED with issues per .cursor/agents/design-reviewer.md."
 - Capture the review result: **APPROVED** or **FAILED** and, if FAILED, the list of issues.
 
 ### Step 3: Handle Review Result
@@ -114,8 +130,10 @@ User: "design: <feature>" (or "design" + description / ref / competitor URL)
 | User → Orchestrator  | Feature description; optional: reference URL, competitor, constraints |
 | Orchestrator → Designer | Feature name, description, output folder path, refs/constraints   |
 | Designer → Orchestrator | Summary of files created, structure                                |
-| Orchestrator → Design Reviewer | Folder path, feature description/requirements                      |
-| Design Reviewer → Orchestrator | APPROVED or FAILED; if FAILED, list of issues                     |
+| Orchestrator → viewport-runner | Design folder path; request to run viewport script               |
+| viewport-runner → Orchestrator | DONE (path to screenshots, list of files) or SKIPPED (reason)    |
+| Orchestrator → Design Reviewer | Folder path, feature description/requirements; note if screenshots present |
+| Design Reviewer → Orchestrator | APPROVED or FAILED; if FAILED, list of issues (code and/or screenshots) |
 | Orchestrator → Designer (rework) | Same folder path + "Review Result: FAILED" + issues list          |
 | Orchestrator → User  | Final path, summary, how to use with implement                       |
 
@@ -137,7 +155,7 @@ User: "design: <feature>" (or "design" + description / ref / competitor URL)
 
 - [ ] Feature description (or ref) is clear enough, or one clarifying question asked.
 - [ ] Output folder path is defined (`designs/<feature-slug>/`).
-- [ ] You have access to `mcp_task` and can pass `subagent_type: designer` and `subagent_type: design-reviewer` with detailed prompts.
+- [ ] You have access to `mcp_task` and can pass `subagent_type: designer`, `subagent_type: viewport-runner`, and `subagent_type: design-reviewer` with detailed prompts.
 
 ---
 
