@@ -1,12 +1,40 @@
 # Architecture — Subagent System
 
-This document describes the high-level architecture of the Cursor subagent system for the full development cycle.
+This document describes the high-level architecture of the Cursor subagent system for the full development cycle. The system has **two segments**: **design** (standalone UI/UX prototypes) and **implement** (architecture, plan, code, review, test, docs).
 
 ## Overview
 
-The system is **orchestration-centric**: one executing agent (the one that reads the implement-feature skill) drives the flow and calls specialized subagents via `mcp_task` with a `subagent_type` and a detailed prompt. There is no shared queue or external scheduler — coordination is linear and phase-based.
+The system is **orchestration-centric**: one executing agent drives each flow and calls specialized subagents via `mcp_task` with a `subagent_type` and a detailed prompt. There is no shared queue or external scheduler — coordination is linear and phase-based.
 
-## High-Level Flow
+- **Design segment:** Executing agent runs **design-feature** skill as **Design Orchestrator**; calls **designer** → **viewport-runner** (screenshots at several resolutions) → **design-reviewer**. Output: folder `designs/<feature-slug>/` with HTML+CSS and optionally `screenshots/`. Not tied to implement.
+- **Implement segment:** Executing agent runs **implement-feature** skill as **Orchestrator**; calls Architect (optional), Planner, Workers, Reviewers, testers, docs-writer. Can consume a design folder path when user provides it.
+
+## Design Flow (standalone)
+
+```
+User: "design: <feature>" (optional: ref URL, competitor, style notes)
+         │
+         ▼
+┌─────────────────────┐
+│ DESIGN ORCHESTRATOR │  (executing agent; management only)
+│ Parse input, set    │  → output folder: designs/<feature-slug>/
+│ output folder       │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│ DESIGNER             │ ──► │ VIEWPORT-RUNNER      │ ──► │ DESIGN REVIEWER      │
+│ HTML+CSS in folder  │     │ server + screenshots │     │ 1. code 2. screens   │
+│ (semantic, a11y)     │     │ → screenshots/ or    │     │ → APPROVED / FAILED  │
+└─────────────────────┘     │   SKIPPED            │     └──────────┬────────────┘
+                            └─────────────────────┘                │
+           │ FAILED (≤3)                │ APPROVED                 │
+           └────────────────────────────┴───────────────────────────┘ → report path
+```
+
+Design flow does not call Architect or Planner. Handoff to implement: user later says **"implement: &lt;feature&gt; — design is ready in `designs/<feature-slug>/`"**; Orchestrator passes that path to Planner and frontend tasks.
+
+## Implement Flow (high-level)
 
 The **Orchestrator** (executing agent) only manages: it decides whom to call and what to pass; it does not write code or create the plan. The **Planner** produces the task list and execution plan.
 
@@ -79,29 +107,46 @@ User: "implement: <feature>"
 
 ## Context Handoffs
 
+### Design segment
+
+| From → To | What is passed |
+|-----------|----------------|
+| User → Design Orchestrator | Feature description; optional ref URL, competitor, style notes |
+| Design Orchestrator → Designer | Feature name, description, output folder path, refs/constraints |
+| Designer → Design Orchestrator | Summary of files created, structure |
+| Design Orchestrator → viewport-runner | Design folder path; request to run viewport script |
+| viewport-runner → Design Orchestrator | DONE (path to screenshots, list of files) or SKIPPED (reason) |
+| Design Orchestrator → Design Reviewer | Folder path, feature description/requirements; note if screenshots present |
+| Design Reviewer → Design Orchestrator | APPROVED or FAILED + issues (code and/or screenshots) |
+| Design Orchestrator → Designer (rework) | Same folder + "FAILED" + issues list |
+| Design Orchestrator → User | Path to folder; how to use with implement |
+
+### Implement segment
+
 | From → To | What is passed |
 |-----------|----------------|
 | User → Architect | Feature description |
+| User → Orchestrator | When design ready: design folder path (e.g. `designs/<feature-slug>/`) |
 | Architect → Planner | Feature + architecture (or summary) + constraints_for_orchestrator + contracts |
-| Planner → Orchestrator | tasks array + execution plan (Orchestrator uses this to run Workers/Reviewers) |
-| Orchestrator → Worker | One task + architecture/contracts relevant to that task |
+| Orchestrator → Planner | Feature + architecture (if any); design folder path when provided |
+| Planner → Orchestrator | tasks array + execution plan |
+| Orchestrator → Worker | One task + architecture/contracts; for frontend: design folder path when provided |
 | Worker → Reviewer | Same task + architecture/contracts + description of changes |
 | Reviewer → Worker (rework) | Same task + "FAILED" + list of issues |
 | Any phase → User | Final report; on conflict or circuit breaker: reason and next steps |
 
 ## Agent Registry
 
-The implement-feature skill keeps an **Agent Registry** table that maps:
+The **implement-feature** skill keeps an **Agent Registry** that maps task `assignee` (from Planner) → `subagent_type` for `mcp_task` (frontend-worker, backend-worker, frontend-reviewer, backend-reviewer, plus testers and docs-writer invoked by Orchestrator at test/docs phase).
 
-- Task `assignee` (string from **Planner** output) → `subagent_type` (string for `mcp_task`).
-
-When you add new agents (e.g. test-runner, docs-writer), add a row to that table and use the same assignee in Architect and Planner outputs so the Orchestrator can dispatch correctly.
+The **design-feature** skill does not use assignees from a plan; the Design Orchestrator calls **designer** and **design-reviewer** explicitly by `subagent_type`. Ensure the environment supports `designer` and `design-reviewer` for `mcp_task` when using the design flow.
 
 ## Failure Handling
 
-- **Architecture conflict:** Architect sets `architecture_conflict: true` → coordinator stops and reports.
-- **Review FAILED (≤3 times):** Coordinator sends issues to Worker and retries the same task.
-- **Review FAILED (4th time):** Circuit breaker — freeze task, suggest decomposition or architecture reassessment, report to user.
+- **Design:** Design Reviewer returns FAILED → Design Orchestrator sends issues to Designer and repeats (max 3 rework cycles). After 3 cycles, circuit breaker: report path and issues, suggest manual fix or re-run design with adjusted requirements.
+- **Implement — architecture conflict:** Architect sets `architecture_conflict: true` → coordinator stops and reports.
+- **Implement — review FAILED (≤3 times):** Coordinator sends issues to Worker and retries the same task.
+- **Implement — review FAILED (4th time):** Circuit breaker — freeze task, suggest decomposition or architecture reassessment, report to user.
 - **Missing subagent type:** Report to user and list available types.
 
 ## Design Principles

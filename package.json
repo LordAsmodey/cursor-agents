@@ -1,0 +1,15 @@
+{
+  "name": "cursor-agents",
+  "version": "1.0.0",
+  "description": "Subagent system for design and implement workflows",
+  "private": true,
+  "scripts": {
+    "viewport-screenshots": "node scripts/viewport-screenshots.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

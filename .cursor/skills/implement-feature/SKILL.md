@@ -100,6 +100,7 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 ### Step 0: Parse User Input
 
 - Extract **feature description** from the user message (e.g. after "implement:" or from the last message).
+- If the user indicates that **design is already ready** (e.g. "design is in `designs/onboarding-wizard/`" or "design folder: designs/checkout-flow"), capture the **design folder path** and pass it to the Planner and to frontend tasks so implementation matches the HTML/CSS in that folder.
 - If the description is vague or too short, ask one clarifying question before starting (e.g. "Which screens and API should this include?").
 
 ### Step 1: Call Architect (Optional)
@@ -113,7 +114,7 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 
 ### Step 2: Call Planner
 
-- **Input to pass:** Feature description; optionally full architecture output (or summary) and explicit note: "Use constraints_for_orchestrator and contracts from the architecture if provided."
+- **Input to pass:** Feature description; optionally full architecture output (or summary) and explicit note: "Use constraints_for_orchestrator and contracts from the architecture if provided." If a **design folder path** was provided (e.g. design ready in `designs/<name>/`), include it so the Planner can scope frontend tasks to implement from that design.
 - **Prompt:** Ask Planner to produce the task list and execution plan per `.cursor/agents/planner.md`: tasks with `id`, `title`, `description`, `scope`, `depends_on`, `acceptance_criteria`, `expected_output`, `assignee`, `parallel_group`. Request execution plan (phases and order).
 - **Output to keep:** `tasks` (array), execution plan (which task runs when, and which are parallel).
 - **You (Orchestrator) do not create the plan** — only call the Planner and use its output.
@@ -210,9 +211,11 @@ Call **docs-writer** once to create or update documentation. No retry loop; if t
 | From → To        | Pass                                                                 |
 |------------------|----------------------------------------------------------------------|
 | User → Architect | Feature description only (and codebase context as needed).           |
+| User → Orchestrator | When design is ready: design folder path (e.g. `designs/<feature-slug>/`). |
 | Architect → Planner | Feature + architecture JSON (or summary) + constraints_for_orchestrator + contracts. |
+| Orchestrator → Planner | Feature + architecture (if any); **design folder path** when provided by user. |
 | Planner → Orchestrator | tasks array + execution plan (Orchestrator uses this to run Workers/Reviewers). |
-| Orchestrator → Worker | One task (title, description, scope, acceptance_criteria, expected_output) + architecture/contracts relevant to that task. |
+| Orchestrator → Worker | One task (title, description, scope, acceptance_criteria, expected_output) + architecture/contracts relevant to that task. For **frontend** tasks: **design folder path** when provided (implement UI to match HTML/CSS in that folder). |
 | Worker → Reviewer | Same task + architecture/contracts + description of changes (or diff). |
 | Reviewer → Worker (rework) | Same task + "Review Result: FAILED" and the list of issues. |
 | Orchestrator → Tester | Feature summary + list of tasks relevant to that tester (with title, description, scope, acceptance_criteria, expected_output). Request: design test cases, write or extend tests, run suite, report PASSED/FAILED per .cursor/agents/<tester>.md. |
