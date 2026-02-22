@@ -105,6 +105,7 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 ### Step 1: Call Architect (Optional)
 
 - **When to call:** Feature is non-trivial. **Call Architect** when: new API module or new API surface, new user flow or screen with its own state, multiple modules or packages affected, changes to module/package boundaries, new integration (e.g. auth, payment). **Skip Architect** when: single-component or single-file change, one new endpoint in an existing module, tiny UI tweak (styles, copy), single bugfix in existing code.
+- **Model:** Invoke the Architect with the **most capable model available** (e.g. pass `model` to `mcp_task` if supported — strongest model such as Claude Opus / extended thinking). The Architect agent is defined to use `model: best`; the Orchestrator should not use a "fast" or default model for this call.
 - **Prompt to pass:** Feature description + request to produce the full architectural design per `.cursor/agents/architect.md` (overview, backend/frontend, contracts, constraints_for_orchestrator, steering_rules, risks). Ask for output in the JSON structure defined in architect.md.
 - **After call:**
   - If `architecture_conflict: true` → report to user with `conflict_reason` and `suggested_refactor`; stop workflow.
