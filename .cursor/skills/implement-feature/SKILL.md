@@ -50,10 +50,11 @@ User: "implement: <feature>"
          ▼
 ┌─────────────────────────────────────────────────────────┐
 │ 3.5 TEST PHASE (after all implementation tasks)          │
+│    Testers: design test cases → write tests → run suite  │
 │    frontend-tester → backend-tester → e2e-tester        │
-│    If any FAILED: test_retry_count++; if < 3: rework    │
-│    affected tasks (Worker → Reviewer) → testers again   │
-│    If test_retry_count ≥ 3: circuit breaker → user       │
+│    If any FAILED: test_retry_count++; if < 3: rework     │
+│    affected tasks (Worker → Reviewer) → testers again    │
+│    Max 3 test retry cycles; then circuit breaker → user  │
 └─────────────────────────────────────────────────────────┘
          │
          ▼
@@ -83,9 +84,9 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 | frontend-reviewer  | frontend-reviewer | Review frontend changes       |
 | backend-worker     | backend-worker    | Implement backend task        |
 | backend-reviewer   | backend-reviewer  | Review backend changes        |
-| frontend-tester    | frontend-tester   | Run frontend test suite       |
-| backend-tester     | backend-tester    | Run backend test suite        |
-| e2e-tester         | e2e-tester        | Build app + E2E/integration   |
+| frontend-tester    | frontend-tester   | Design test cases, write frontend tests, run suite       |
+| backend-tester     | backend-tester    | Design test cases, write backend tests, run suite        |
+| e2e-tester         | e2e-tester        | Design E2E cases, write E2E tests, build + run            |
 | —                  | docs-writer       | Create/update ADR, README, docs (after test phase) |
 | architect          | architect         | Produce architecture design   |
 | planner            | planner           | Create tasks + execution plan |
@@ -148,33 +149,35 @@ Map task `assignee` from **Planner** output to `subagent_type` for `mcp_task`. T
 
 ### Step 3.5: Test Phase (after all implementation tasks)
 
-Run testers in order; maintain **test_retry_count** (initially **0**). Maximum **3 test retry cycles**: if tests fail, rework affected tasks (Worker → Reviewer) and re-run test phase; after 3 such cycles, run the test circuit breaker.
+Run testers in order; maintain **test_retry_count** (initially **0**). Maximum **3 test retry cycles** (no more than 3 tries) to avoid infinite loops: if tests fail, rework affected tasks (Worker → Reviewer), then re-run test phase; after 3 such cycles, run the test circuit breaker.
+
+**Context to pass to each tester:** Feature summary and the **list of tasks relevant to that tester** (frontend-tester: tasks with assignee `frontend-worker`; backend-tester: tasks with assignee `backend-worker`; e2e-tester: all implementation tasks or key flows), each with `title`, `description`, `scope`, `acceptance_criteria`, `expected_output`. Testers use this to design test cases, write or extend tests, then run the suite.
 
 1. **Call frontend-tester**  
    - `subagent_type` = `frontend-tester`.  
-   - **Prompt:** “Run the frontend test suite for this project. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/frontend-tester.md.”  
+   - **Prompt:** “Include feature summary and the list of **frontend tasks** (assignee frontend-worker) with title, description, scope, acceptance_criteria, expected_output. Ask: Design test cases from these tasks and acceptance_criteria, write or extend frontend tests to cover them, then run the frontend test suite. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/frontend-tester.md.”  
    - If **PASSED**, continue to step 3.5.2.  
    - If **FAILED**: go to step 3.5.4 (test rework cycle).
 
 2. **Call backend-tester**  
    - `subagent_type` = `backend-tester`.  
-   - **Prompt:** “Run the backend test suite for this project. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/backend-tester.md.”  
+   - **Prompt:** “Include feature summary and the list of **backend tasks** (assignee backend-worker) with title, description, scope, acceptance_criteria, expected_output. Ask: Design test cases from these tasks and acceptance_criteria, write or extend backend tests to cover them, then run the backend test suite. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/backend-tester.md.”  
    - If **PASSED**, continue to step 3.5.3.  
    - If **FAILED**: go to step 3.5.4 (test rework cycle).
 
 3. **Call e2e-tester**  
    - `subagent_type` = `e2e-tester`.  
-   - **Prompt:** “Build the application and run E2E/integration tests. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/e2e-tester.md.”  
+   - **Prompt:** “Include feature summary and the list of **all implementation tasks** (or key flows) with title, description, scope, acceptance_criteria, expected_output. Ask: Design E2E test cases from the feature and tasks, write or extend E2E/integration tests, then build and run them. Report Test Result: PASSED or FAILED with Summary and, if FAILED, Failures (for Worker) and Suggested focus per .cursor/agents/e2e-tester.md.”  
    - If **PASSED**, go to Step 3.6 (Docs Phase).  
    - If **FAILED**: go to step 3.5.4 (test rework cycle).
 
 4. **Test rework cycle (when any tester reported FAILED)**  
    - **Increment** test_retry_count.  
-   - If test_retry_count **≥ 3**: run **test circuit breaker** (see “After 3 test retries” below); then go to Step 3.6 (Docs Phase).  
-   - **Identify affected tasks** from the plan by domain: frontend failure → tasks with assignee `frontend-worker`; backend failure → tasks with assignee `backend-worker`; E2E failure → all implementation tasks or those suggested by e2e-tester.  
-   - For each affected task (in execution order): call **Worker** with the task + “Test Result: FAILED” and the tester’s Failures/Suggested focus; then call **Reviewer** with the same task and changes.  
+   - If test_retry_count **≥ 3**: run **test circuit breaker** (see “After 3 test retries” below); then go to Step 3.6 (Docs Phase). Do not retry again — maximum 3 test retry cycles.  
+   - **Identify affected tasks** by domain: frontend failure → tasks with assignee `frontend-worker`; backend failure → tasks with assignee `backend-worker`; E2E failure → all implementation tasks or those suggested by e2e-tester.  
+   - For each affected task (in execution order): call **Worker** with the task + “Test Result: FAILED” and the tester’s Failures/Suggested focus; then call **Reviewer** with the same task and the Worker's changes.  
    - If any review is FAILED, handle with the existing per-task rework_count (max 3 per task).  
-   - When all affected tasks have been reworked and reviewed (APPROVED), go back to step 3.5.1 (re-run frontend-tester, then backend-tester, then e2e-tester). Do not increment test_retry_count for review failures inside this cycle — only when a tester again reports FAILED.
+   - When all affected tasks have been reworked and **reviewed (APPROVED)**, go back to step 3.5.1 (re-run frontend-tester, then backend-tester, then e2e-tester). Flow: Orchestrator → Worker (feedback) → Reviewer → if APPROVED, Orchestrator re-runs test phase. Do not increment test_retry_count for review failures inside this cycle — only when a tester again reports FAILED.
 
 ### Step 3.6: Docs Phase (after test phase, before report)
 
@@ -211,7 +214,7 @@ Call **docs-writer** once to create or update documentation. No retry loop; if t
 | Orchestrator → Worker | One task (title, description, scope, acceptance_criteria, expected_output) + architecture/contracts relevant to that task. |
 | Worker → Reviewer | Same task + architecture/contracts + description of changes (or diff). |
 | Reviewer → Worker (rework) | Same task + "Review Result: FAILED" and the list of issues. |
-| Orchestrator → Tester | Request to run tests and report PASSED/FAILED per .cursor/agents/<tester>.md. |
+| Orchestrator → Tester | Feature summary + list of tasks relevant to that tester (with title, description, scope, acceptance_criteria, expected_output). Request: design test cases, write or extend tests, run suite, report PASSED/FAILED per .cursor/agents/<tester>.md. |
 | Tester → Orchestrator | Test Result: PASSED or FAILED; if FAILED, Summary, Failures (for Worker), Suggested focus. |
 | Orchestrator → Worker (test rework) | Affected task(s) + "Test Result: FAILED" + tester’s Failures and Suggested focus. |
 | Orchestrator → docs-writer | Feature summary, completed tasks, key files changed, test phase result, optional architecture summary, optional adr_candidate. |

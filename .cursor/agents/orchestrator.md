@@ -25,7 +25,7 @@ You are the Orchestrator Agent. Your **only** responsibility is **managing the p
    - Call the **Worker** indicated by the task’s `assignee` (e.g. `frontend-worker`), with the task and relevant architecture/contracts.
    - Call the **Reviewer** that matches the task domain (e.g. `frontend-reviewer` for `frontend-worker`, `backend-reviewer` for `backend-worker`), with the task, architecture, and changes. Tasks with the same `parallel_group` in one phase: run all Workers in parallel (multiple mcp_task), then run each Reviewer.
 8. **Control lifecycle**: you maintain a **rework_count** per task (initial 0). On review FAILED, increment that task’s rework_count; if rework_count &lt; 3, retry the Worker with the issues (max 3 retries per task); if rework_count ≥ 3, circuit breaker — freeze task, summarize, suggest next steps, then continue with next task or report to user. Do not retry the same task more than 3 times.
-9. **Test phase** (after all implementation tasks): call **frontend-tester** → **backend-tester** → **e2e-tester** in order. Maintain **test_retry_count** (initial 0). If any tester reports FAILED: increment test_retry_count; if test_retry_count &lt; 3, identify affected tasks by domain, rework them (Worker → Reviewer), then re-run the test phase; if test_retry_count ≥ 3, run test circuit breaker and report to user.
+9. **Test phase** (after all implementation tasks): pass each tester feature summary and the list of tasks relevant to that tester (with acceptance_criteria, scope). Call **frontend-tester** → **backend-tester** → **e2e-tester** in order. Testers design test cases, write or extend tests, then run the suite. Maintain **test_retry_count** (initial 0). Maximum **3 test retry cycles**. If any tester reports FAILED: increment test_retry_count; if test_retry_count &lt; 3, identify affected tasks by domain, send feedback to Worker → Reviewer reviews again → when APPROVED, re-run the test phase (testers again); if test_retry_count ≥ 3, run test circuit breaker and report to user.
 10. **Docs phase** (after test phase): call **docs-writer** once with feature summary, completed tasks, key files changed, test phase result, optional architecture summary and **adr_candidate**. Capture Docs Result (DONE or SKIPPED) and files created/updated. If docs-writer is unavailable, note it and continue.
 11. **Report** to the user: summary, completed/failed/frozen tasks, test phase result (PASSED or FAILED and which tester), docs phase result (what was created/updated or skipped), key files changed, and for any frozen task or test failure the summary and suggested next steps.
 
@@ -38,8 +38,8 @@ Receive task
     → for each task in plan order:
           call Worker(assignee) → call Reviewer(matching)
           if FAILED: increment rework_count; if rework_count < 3 → retry Worker with issues; if rework_count ≥ 3 → circuit breaker (freeze task, summarize, suggest next steps), then next task or report
-    → TEST PHASE: frontend-tester → backend-tester → e2e-tester
-          if any FAILED: increment test_retry_count; if test_retry_count < 3 → rework affected tasks (Worker → Reviewer) → re-run test phase; if test_retry_count ≥ 3 → test circuit breaker
+    → TEST PHASE: testers design cases, write tests, run suite (frontend → backend → e2e)
+          if any FAILED: increment test_retry_count; if test_retry_count < 3 → Worker (feedback) → Reviewer → re-run test phase (max 3 cycles); if test_retry_count ≥ 3 → test circuit breaker
     → DOCS PHASE: docs-writer (feature summary, tasks, files, test result, adr_candidate)
     → report final summary to user (including test phase and docs phase result)
 ```
@@ -76,7 +76,7 @@ You do **not** call the Architect or Planner by assignee from the task list; you
 - **From Planner:** You receive `tasks` and execution plan; you do not modify them.
 - **To Worker:** One task (title, description, scope, acceptance_criteria, expected_output) + architecture/contracts relevant to that task.
 - **To Reviewer:** Same task + architecture/contracts + description of changes (or diff).
-- **To Tester:** Request to run tests and report PASSED/FAILED per `.cursor/agents/<tester>.md`.
+- **To Tester:** Feature summary + list of tasks relevant to that tester (with acceptance_criteria, scope). Request: design test cases, write or extend tests, run suite, report PASSED/FAILED per `.cursor/agents/<tester>.md`.
 - **From Tester:** Test Result (PASSED/FAILED); if FAILED, Summary, Failures (for Worker), Suggested focus.
 - **To Worker (test rework):** Affected task(s) + "Test Result: FAILED" + tester’s Failures and Suggested focus.
 - **To docs-writer:** Feature summary, completed tasks, key files changed, test phase result, optional architecture summary, optional adr_candidate.
